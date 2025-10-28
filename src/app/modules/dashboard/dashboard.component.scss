@@ -1,0 +1,27 @@
+.metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background-color: rgba(50, 45, 92, 0.1);
+  font-size: 1.5rem;
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+.table > :not(caption) > * > * {
+  vertical-align: middle;
+}
+
+.list-group-item {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: rgba(50, 45, 92, 0.08);
+  }
+}

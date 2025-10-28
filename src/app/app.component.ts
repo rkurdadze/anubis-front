@@ -1,13 +1,19 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { AsyncPipe, NgIf } from '@angular/common';
+
+import { LoadingOverlayComponent } from './shared/components/loading-overlay/loading-overlay.component';
+import { LoadingIndicatorService } from './core/services/loading-indicator.service';
+import { NavigationComponent } from './layout/navigation/navigation.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  styleUrls: ['./app.component.scss'],
+  imports: [RouterOutlet, LoadingOverlayComponent, AsyncPipe, NgIf, NavigationComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppComponent {
-  title = 'anubis-front';
+  constructor(public readonly loader: LoadingIndicatorService) {}
 }

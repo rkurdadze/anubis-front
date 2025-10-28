@@ -1,0 +1,20 @@
+.app-nav {
+  width: 280px;
+  min-height: 100vh;
+}
+
+.nav-link {
+  border-left: 4px solid transparent;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+
+  &.active,
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--anubis-accent);
+    color: #fff;
+  }
+}
+
+.brand {
+  background: rgba(255, 255, 255, 0.05);
+}

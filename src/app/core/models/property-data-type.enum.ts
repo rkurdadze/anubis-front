@@ -1,0 +1,9 @@
+export enum PropertyDataType {
+  TEXT = 'TEXT',
+  INTEGER = 'INTEGER',
+  FLOAT = 'FLOAT',
+  BOOLEAN = 'BOOLEAN',
+  DATE = 'DATE',
+  VALUELIST = 'VALUELIST',
+  MULTI_VALUELIST = 'MULTI_VALUELIST'
+}

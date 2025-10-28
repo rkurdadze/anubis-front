@@ -1,1 +1,23 @@
-/* You can add global styles to this file, and also import other style files */
+@import 'bootstrap/scss/bootstrap';
+
+:root {
+  --anubis-primary: #322d5c;
+  --anubis-accent: #f5a623;
+  --anubis-surface: #f4f6fb;
+  --anubis-text: #1f2233;
+}
+
+body {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  background-color: var(--anubis-surface);
+  color: var(--anubis-text);
+  margin: 0;
+}
+
+.anubis-shadow {
+  box-shadow: 0 0.5rem 1rem rgba(18, 38, 63, 0.12);
+}
+
+.text-muted {
+  color: rgba(31, 34, 51, 0.65) !important;
+}

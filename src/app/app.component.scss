@@ -1,0 +1,23 @@
+.app-wrapper {
+  min-height: 100vh;
+}
+
+.app-content {
+  background-color: var(--anubis-surface);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-weight: 600;
+}
+
+.app-body {
+  min-height: calc(100vh - 72px);
+}
