@@ -194,9 +194,9 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
 
   get classPrimaryButtonIcon(): string {
     if (!this.isClassFormOpen) {
-      return 'bi-plus-lg';
+      return 'fa-solid fa-plus';
     }
-    return this.classForm.valid ? 'bi-check-lg' : 'bi-pencil';
+    return this.classForm.valid ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-pen';
   }
 
   get classPrimaryButtonClasses(): string {
@@ -215,6 +215,9 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   }
 
   closeClassForm(): void {
+    this.selectedClassId$.next(null);
+    this.classForm.reset({ name: '', objectTypeId: null, description: '', isActive: true });
+    this.bindingForm.reset({ propertyDefId: null, isReadonly: false, isHidden: false, displayOrder: 0 });
     this.isClassFormOpen = false;
   }
 

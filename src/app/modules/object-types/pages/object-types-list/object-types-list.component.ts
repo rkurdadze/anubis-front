@@ -117,9 +117,9 @@ export class ObjectTypesListComponent implements OnDestroy {
 
   get typePrimaryButtonIcon(): string {
     if (!this.isTypeFormOpen) {
-      return 'bi-plus-lg';
+      return 'fa-solid fa-plus';
     }
-    return this.typeForm.valid ? 'bi-check-lg' : 'bi-pencil';
+    return this.typeForm.valid ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-pen';
   }
 
   get typePrimaryButtonClasses(): string {

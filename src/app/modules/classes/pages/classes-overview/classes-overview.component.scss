@@ -1,18 +1,31 @@
-.container-fluid {
+.classes-page {
   max-width: 1320px;
-}
+  margin: 0 auto;
 
-.card {
-  border-radius: 1rem;
-}
+  .card {
+    border-radius: 1rem;
+  }
 
-.section-stack {
-  display: grid;
-  gap: 1.5rem;
-}
+  .section-stack {
+    display: grid;
+    gap: 1.5rem;
+  }
 
-.table-hover tbody tr.table-active {
-  --bs-table-bg: rgba(13, 110, 253, 0.08);
+  .table-hover tbody tr.table-active {
+    --bs-table-bg: rgba(13, 110, 253, 0.08);
+  }
+
+  .badge + .badge {
+    margin-left: 0.5rem;
+  }
+
+  .placeholder-card {
+    min-height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 .form-switch {
@@ -28,16 +41,4 @@
 
 .form-switch .form-check-label {
   font-weight: 500;
-}
-
-.badge + .badge {
-  margin-left: 0.5rem;
-}
-
-.placeholder-card {
-  min-height: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
 }

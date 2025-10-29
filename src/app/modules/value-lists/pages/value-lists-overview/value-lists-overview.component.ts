@@ -151,6 +151,9 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
   }
 
   closeListForm(): void {
+    this.selectedListId$.next(null);
+    this.listForm.reset({ name: '', isActive: true, nameI18n: '' });
+    this.itemForm.reset({ value: '', valueI18n: '', sortOrder: 0, parentItemId: null, externalCode: '', isActive: true });
     this.isListFormOpen = false;
   }
 
@@ -163,9 +166,9 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
 
   get listPrimaryButtonIcon(): string {
     if (!this.isListFormOpen) {
-      return 'bi-plus-lg';
+      return 'fa-solid fa-plus';
     }
-    return this.listForm.valid ? 'bi-check-lg' : 'bi-pencil';
+    return this.listForm.valid ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-pen';
   }
 
   get listPrimaryButtonClasses(): string {

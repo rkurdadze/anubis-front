@@ -18,13 +18,13 @@ interface NavItem {
 })
 export class NavigationComponent {
   readonly items: NavItem[] = [
-    { label: 'Панель управления', icon: 'bi-grid', route: '/dashboard' },
-    { label: 'Объекты', icon: 'bi-collection', route: '/objects' },
-    { label: 'Типы объектов', icon: 'bi-diagram-3', route: '/object-types' },
-    { label: 'Классы', icon: 'bi-layers', route: '/classes' },
-    { label: 'Свойства', icon: 'bi-ui-checks-grid', route: '/properties' },
-    { label: 'Справочники', icon: 'bi-card-checklist', route: '/value-lists' },
-    { label: 'Представления', icon: 'bi-folder2-open', route: '/views' },
-    { label: 'Поиск', icon: 'bi-search', route: '/search' }
+    { label: 'Панель управления', icon: 'fa-solid fa-gauge-high', route: '/dashboard' },
+    { label: 'Объекты', icon: 'fa-solid fa-box-archive', route: '/objects' },
+    { label: 'Типы объектов', icon: 'fa-solid fa-diagram-project', route: '/object-types' },
+    { label: 'Классы', icon: 'fa-solid fa-layer-group', route: '/classes' },
+    { label: 'Свойства', icon: 'fa-solid fa-table-cells-large', route: '/properties' },
+    { label: 'Справочники', icon: 'fa-solid fa-list-check', route: '/value-lists' },
+    { label: 'Представления', icon: 'fa-solid fa-folder-tree', route: '/views' },
+    { label: 'Поиск', icon: 'fa-solid fa-magnifying-glass', route: '/search' }
   ];
 }

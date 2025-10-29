@@ -1,41 +1,29 @@
-.container-fluid {
+.value-lists-page {
   max-width: 1320px;
+  margin: 0 auto;
+
+  .card {
+    border-radius: 1rem;
+  }
+
+  .section-stack {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .list-group-item.active {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: inherit;
+    border-color: rgba(13, 110, 253, 0.2);
+  }
+
+  .list-group-item.active .badge {
+    background-color: var(--bs-primary);
+    color: #fff;
+  }
+
+  .badge {
+    font-weight: 500;
+  }
 }
 
-.card {
-  border-radius: 1rem;
-}
-
-.section-stack {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.list-group-item.active {
-  background-color: rgba(13, 110, 253, 0.1);
-  color: inherit;
-  border-color: rgba(13, 110, 253, 0.2);
-}
-
-.list-group-item.active .badge {
-  background-color: var(--bs-primary);
-  color: #fff;
-}
-
-.form-check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.badge {
-  font-weight: 500;
-}
-
-.placeholder-card {
-  min-height: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}

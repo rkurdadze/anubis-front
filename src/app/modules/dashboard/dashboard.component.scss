@@ -25,3 +25,20 @@
     background-color: rgba(50, 45, 92, 0.08);
   }
 }
+
+.system-actions-card {
+  .list-group-item {
+    font-size: 0.98rem;
+    font-weight: 500;
+    padding: 1.05rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .badge {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+}

@@ -1,8 +1,9 @@
-.container-fluid {
+.object-types-page {
   max-width: 1200px;
+  margin: 0 auto;
 }
 
-.search-box {
+.object-types-page .search-box {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -13,11 +14,11 @@
   min-width: 260px;
 }
 
-.search-box i {
+.object-types-page .search-box i {
   color: var(--bs-gray-500);
 }
 
-.search-box .form-control {
+.object-types-page .search-box .form-control {
   border: none;
   box-shadow: none;
   padding: 0;

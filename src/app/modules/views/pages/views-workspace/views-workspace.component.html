@@ -1,32 +1,39 @@
-<div class="container-fluid py-4">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-    <div>
+<section class="container-fluid py-4 views-workspace">
+  <header class="page-header">
+    <div class="page-header__title">
       <h1 class="h3 mb-1">Представления</h1>
-      <p class="text-muted mb-0">Создание пользовательских представлений и запуск запросов с фильтрами</p>
+      <p class="text-muted mb-0 page-header__description">Создание пользовательских представлений и запуск запросов с фильтрами</p>
     </div>
-    <form [formGroup]="userForm" class="d-flex flex-wrap gap-2 align-items-center" (ngSubmit)="loadViews()">
-      <div class="input-group input-group-sm">
-        <span class="input-group-text">Пользователь</span>
-        <input type="number" class="form-control" formControlName="userId" />
-      </div>
-      <button type="submit" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-arrow-repeat me-1"></i>Обновить
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="createView()">
-        <i class="bi bi-plus-lg me-1"></i>Новое представление
-      </button>
-    </form>
-  </div>
+    <div class="page-header__actions">
+      <form
+        [formGroup]="userForm"
+        class="d-flex flex-wrap gap-2 align-items-center"
+        (ngSubmit)="loadViews()"
+      >
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">Пользователь</span>
+          <input type="number" class="form-control" formControlName="userId" />
+        </div>
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="fa-solid fa-rotate-right me-1"></i>Обновить
+        </button>
+        <button type="button" class="btn-sm" [ngClass]="viewPrimaryButtonClasses" (click)="handleViewPrimaryAction()">
+          <i class="fa-fw" [ngClass]="viewPrimaryButtonIcon"></i>
+          <span class="ms-1">{{ viewPrimaryButtonLabel }}</span>
+        </button>
+      </form>
+    </div>
+  </header>
 
   <div *ngIf="message$ | async as message" class="alert" [ngClass]="message.type === 'success' ? 'alert-success' : 'alert-danger'">
     {{ message.text }}
   </div>
 
-  <div class="row g-4">
+  <div class="row g-4 align-items-start">
     <div class="col-12 col-xl-4">
       <div class="card border-0 anubis-shadow h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h2 class="h6 mb-0">Доступные представления</h2>
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+          <h2 class="h5 mb-0">Доступные представления</h2>
           <span *ngIf="isLoading" class="spinner-border spinner-border-sm text-primary"></span>
         </div>
         <div class="list-group list-group-flush">
@@ -44,7 +51,7 @@
         </div>
         <div class="card-footer bg-white text-end" *ngIf="selectedView as current">
           <button class="btn btn-outline-danger btn-sm" type="button" (click)="deleteView(current)">
-            <i class="bi bi-trash"></i> Удалить
+            <i class="fa-solid fa-trash me-1"></i>Удалить
           </button>
         </div>
       </div>
@@ -52,51 +59,73 @@
 
     <div class="col-12 col-xl-8 mt-4 mt-xl-0">
       <div class="section-stack">
-        <div class="card border-0 anubis-shadow">
-          <div class="card-header bg-white">
-            <h2 class="h5 mb-0">{{ selectedView?.name ?? 'Новое представление' }}</h2>
-          </div>
-          <div class="card-body">
-            <form [formGroup]="viewForm" class="row g-3" (ngSubmit)="saveView()">
-              <div class="col-12 col-lg-6">
-                <label class="form-label">Название</label>
-                <input type="text" class="form-control" formControlName="name" [class.is-invalid]="viewForm.get('name')?.invalid && viewForm.get('name')?.touched" />
-                <div class="invalid-feedback">Укажите название представления.</div>
+        <ng-container *ngIf="isViewFormOpen; else viewFormPlaceholder">
+          <div class="card border-0 anubis-shadow">
+            <div class="card-header bg-white d-flex justify-content-between align-items-start py-3">
+              <div>
+                <h2 class="h5 mb-0">{{ selectedView?.name ?? 'Новое представление' }}</h2>
+                <p class="text-muted small mb-0" *ngIf="!selectedView">Заполните форму, чтобы создать пользовательское представление</p>
+                <p class="text-muted small mb-0" *ngIf="selectedView">Редактирование выбранного представления</p>
               </div>
-              <div class="col-12 col-lg-3">
-                <label class="form-label">Сортировка</label>
-                <input type="number" class="form-control" formControlName="sortOrder" />
-              </div>
-              <div class="col-12 col-lg-3 d-flex align-items-center">
-                <div class="form-check form-switch mt-lg-4">
-                  <input class="form-check-input" type="checkbox" id="isCommon" formControlName="isCommon" />
-                  <label class="form-check-label" for="isCommon">Общее</label>
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closeViewForm()">
+                <i class="fa-solid fa-xmark me-1"></i>Скрыть
+              </button>
+            </div>
+            <div class="card-body">
+              <form [formGroup]="viewForm" class="row g-3" (ngSubmit)="saveView()">
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Название</label>
+                  <input type="text" class="form-control" formControlName="name" [class.is-invalid]="viewForm.get('name')?.invalid && viewForm.get('name')?.touched" />
+                  <div class="invalid-feedback">Укажите название представления.</div>
                 </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Фильтр (JSON)</label>
-                <textarea class="form-control" rows="3" formControlName="filterJson" placeholder='{"propertyDefId":1,"op":"EQ","value":"..."}'></textarea>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Группировки (JSON массив)</label>
-                <textarea class="form-control" rows="3" formControlName="groupingsJson" placeholder='[{"level":1,"propertyDefId":100}]'></textarea>
-              </div>
-              <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
-                  {{ selectedView ? 'Сохранить изменения' : 'Создать представление' }}
-                </button>
-                <button type="button" class="btn btn-outline-secondary flex-fill" (click)="createView()">Очистить</button>
-              </div>
-            </form>
+                <div class="col-12 col-lg-3">
+                  <label class="form-label">Сортировка</label>
+                  <input type="number" class="form-control" formControlName="sortOrder" />
+                </div>
+                <div class="col-12 col-lg-3 views-workspace__switch">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="isCommon" formControlName="isCommon" />
+                    <label class="form-check-label" for="isCommon">Общее</label>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Фильтр (JSON)</label>
+                  <textarea class="form-control" rows="3" formControlName="filterJson" placeholder='{"propertyDefId":1,"op":"EQ","value":"..."}'></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Группировки (JSON массив)</label>
+                  <textarea class="form-control" rows="3" formControlName="groupingsJson" placeholder='[{"level":1,"propertyDefId":100}]'></textarea>
+                </div>
+                <div class="col-12 d-flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
+                    <i class="fa-solid" [ngClass]="selectedView ? 'fa-floppy-disk' : 'fa-plus'"></i>
+                    <span class="ms-2">{{ selectedView ? 'Сохранить изменения' : 'Создать представление' }}</span>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary flex-fill" (click)="cancelViewChanges()">
+                    <i class="fa-solid fa-ban"></i>
+                    <span class="ms-2">{{ selectedView ? 'Отменить изменения' : 'Отменить создание' }}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </ng-container>
+
+        <ng-template #viewFormPlaceholder>
+          <div class="card border-0 anubis-shadow placeholder-card">
+            <div class="card-body text-center py-5">
+              <i class="fa-solid fa-filter display-5 text-primary"></i>
+              <p class="mt-3 mb-0 text-muted">Нажмите «Новое представление», чтобы открыть форму создания.</p>
+            </div>
+          </div>
+        </ng-template>
 
         <div class="card border-0 anubis-shadow">
-          <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+          <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center py-3">
             <h2 class="h6 mb-0">Результаты выполнения</h2>
             <div class="d-flex gap-2">
               <button class="btn btn-outline-primary btn-sm" type="button" (click)="selectedView && executeView(selectedView)" [disabled]="!selectedView || isExecuting">
-                <i class="bi bi-play-fill"></i> Запуск
+                <i class="fa-solid fa-play me-1"></i>Запуск
               </button>
               <div class="input-group input-group-sm" [formGroup]="userForm">
                 <span class="input-group-text">Пользователь ACL</span>
@@ -107,7 +136,7 @@
                   (click)="selectedView && executeViewWithAcl(selectedView)"
                   [disabled]="!selectedView"
                 >
-                  ACL
+                  <i class="fa-solid fa-user-shield me-1"></i>ACL
                 </button>
               </div>
             </div>
@@ -169,4 +198,4 @@
       </div>
     </div>
   </div>
-</div>
+</section>

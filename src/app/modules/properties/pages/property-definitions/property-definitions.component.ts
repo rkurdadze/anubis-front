@@ -175,6 +175,18 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
 
   closePropertyForm(): void {
     this.editingProperty = null;
+    this.propertyForm.reset({
+      name: '',
+      dataType: PropertyDataType.TEXT,
+      refObjectTypeId: null,
+      valueListId: null,
+      isRequired: false,
+      isUnique: false,
+      isMultiselect: false,
+      regex: '',
+      defaultValue: '',
+      description: ''
+    });
     this.isPropertyFormOpen = false;
   }
 
@@ -187,9 +199,9 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
 
   get propertyPrimaryButtonIcon(): string {
     if (!this.isPropertyFormOpen) {
-      return 'bi-plus-lg';
+      return 'fa-solid fa-plus';
     }
-    return this.propertyForm.valid ? 'bi-check-lg' : 'bi-pencil';
+    return this.propertyForm.valid ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-pen';
   }
 
   get propertyPrimaryButtonClasses(): string {

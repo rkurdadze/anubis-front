@@ -21,3 +21,102 @@ body {
 .text-muted {
   color: rgba(31, 34, 51, 0.65) !important;
 }
+
+/* Form controls */
+.form-label {
+  font-weight: 600;
+  color: rgba(31, 34, 51, 0.85);
+}
+
+.form-control,
+.form-select {
+  border-radius: 0.75rem;
+  border-color: rgba(50, 45, 92, 0.2);
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--anubis-primary);
+  box-shadow: 0 0 0 0.25rem rgba(50, 45, 92, 0.15);
+}
+
+.form-select {
+  background-color: #fff;
+  background-image: none;
+}
+
+.form-check-input {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 0.35rem;
+  border-color: rgba(50, 45, 92, 0.35);
+  background-color: rgba(50, 45, 92, 0.12);
+  cursor: pointer;
+  margin-top: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-check-input:focus {
+  border-color: var(--anubis-primary);
+  box-shadow: 0 0 0 0.2rem rgba(50, 45, 92, 0.12);
+}
+
+.form-check-input:checked {
+  background-color: var(--anubis-primary);
+  border-color: var(--anubis-primary);
+}
+
+.form-check.form-switch .form-check-input {
+  width: 2.5rem;
+  height: 1.35rem;
+  border-radius: 2rem;
+  background-color: rgba(50, 45, 92, 0.18);
+}
+
+.form-check.form-switch .form-check-input:checked {
+  background-color: var(--anubis-primary);
+}
+
+/* Page header */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem 1.75rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(32, 201, 151, 0.08));
+}
+
+.page-header__title {
+  flex: 1 1 auto;
+  min-width: 240px;
+}
+
+.page-header__title h1 {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.page-header__description {
+  margin: 0;
+  color: rgba(31, 34, 51, 0.65);
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 991.98px) {
+  .page-header {
+    padding: 1.25rem;
+  }
+}

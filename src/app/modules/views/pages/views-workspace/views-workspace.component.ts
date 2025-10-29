@@ -103,6 +103,18 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   closeViewForm(): void {
+    if (this.selectedView) {
+      this.isViewFormOpen = false;
+      return;
+    }
+    this.resetForm();
+  }
+
+  cancelViewChanges(): void {
+    if (this.selectedView) {
+      this.applySelection(this.selectedView);
+      return;
+    }
     this.resetForm();
   }
 
@@ -115,9 +127,9 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
 
   get viewPrimaryButtonIcon(): string {
     if (!this.isViewFormOpen) {
-      return 'bi-plus-lg';
+      return 'fa-solid fa-plus';
     }
-    return this.viewForm.valid ? 'bi-check-lg' : 'bi-pencil';
+    return this.viewForm.valid ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-pen';
   }
 
   get viewPrimaryButtonClasses(): string {

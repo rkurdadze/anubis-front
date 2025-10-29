@@ -1,11 +1,11 @@
 <section class="object-detail">
   <div class="d-flex align-items-center gap-2 mb-3">
     <a routerLink="/objects" class="btn btn-link px-0">
-      <i class="bi bi-arrow-left"></i>
+      <i class="fa-solid fa-arrow-left"></i>
       <span class="ms-1">К списку объектов</span>
     </a>
     <button type="button" class="btn btn-outline-secondary" (click)="refreshAll()">
-      <i class="bi bi-arrow-repeat me-1"></i>
+      <i class="fa-solid fa-rotate-right me-1"></i>
       Обновить данные
     </button>
   </div>
@@ -75,6 +75,7 @@
             </small>
             <button type="submit" class="btn btn-primary" [disabled]="isSavingObject || objectForm.invalid">
               <span *ngIf="isSavingObject" class="spinner-border spinner-border-sm me-1"></span>
+              <i class="fa-solid fa-floppy-disk me-1"></i>
               Сохранить изменения
             </button>
           </div>
@@ -111,7 +112,10 @@
               </select>
             </div>
             <div class="d-flex gap-2">
-              <button type="button" class="btn btn-outline-secondary" (click)="resetProperties()">Сбросить</button>
+              <button type="button" class="btn btn-outline-secondary" (click)="resetProperties()">
+                <i class="fa-solid fa-rotate-left me-1"></i>
+                Сбросить
+              </button>
               <button
                 type="button"
                 class="btn btn-primary"
@@ -119,6 +123,7 @@
                 (click)="saveProperties(versionInfo.version)"
               >
                 <span *ngIf="isSavingProperties" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="fa-solid fa-floppy-disk me-1"></i>
                 Сохранить свойства
               </button>
             </div>
@@ -160,7 +165,8 @@
                       </div>
                       <div class="col-md-1 text-end">
                         <button type="button" class="btn btn-outline-danger" (click)="removeProperty(i)">
-                          <i class="bi bi-trash"></i>
+                          <i class="fa-solid fa-trash"></i>
+                          <span class="visually-hidden">Удалить свойство</span>
                         </button>
                       </div>
                     </div>
@@ -169,7 +175,7 @@
               </div>
               <div class="d-flex justify-content-between align-items-center mt-3">
                 <button type="button" class="btn btn-outline-primary" (click)="addProperty()">
-                  <i class="bi bi-plus-lg me-1"></i>
+                  <i class="fa-solid fa-plus me-1"></i>
                   Добавить свойство
                 </button>
                 <span class="text-muted small">Всего свойств: {{ propertiesControls.length }}</span>
@@ -221,7 +227,10 @@
         <div class="card border-0 anubis-shadow mt-4" *ngIf="selectedVersionWithAudit$ | async as versionInfo">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h3 class="h6 mb-0">Журнал изменений версии</h3>
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refreshAudit()">Обновить</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refreshAudit()">
+              <i class="fa-solid fa-rotate-right me-1"></i>
+              Обновить
+            </button>
           </div>
           <div class="card-body">
             <p class="text-muted" *ngIf="!versionInfo.version">Выберите версию, чтобы увидеть историю изменений.</p>
@@ -258,7 +267,7 @@
                 <h3 class="h6 mb-0">Файлы объекта</h3>
                 <label class="btn btn-outline-primary btn-sm mb-0">
                   <input type="file" class="d-none" (change)="uploadFile(object, $event)" [disabled]="isUploadingFile" />
-                  <i class="bi bi-upload"></i>
+                  <i class="fa-solid fa-upload"></i>
                   <span class="ms-1">Загрузить</span>
                 </label>
               </div>
@@ -273,14 +282,17 @@
                       </div>
                       <div class="btn-group btn-group-sm">
                         <button type="button" class="btn btn-outline-secondary" (click)="downloadFile(file)">
-                          <i class="bi bi-download"></i>
+                          <i class="fa-solid fa-download"></i>
+                          <span class="visually-hidden">Скачать</span>
                         </button>
                         <label class="btn btn-outline-primary mb-0">
-                          <i class="bi bi-arrow-repeat"></i>
+                          <i class="fa-solid fa-arrows-rotate"></i>
+                          <span class="visually-hidden">Заменить файл</span>
                           <input type="file" class="d-none" (change)="replaceFile(file, $event)" [disabled]="isUploadingFile" />
                         </label>
                         <button type="button" class="btn btn-outline-danger" (click)="deleteFile(file)">
-                          <i class="bi bi-trash"></i>
+                          <i class="fa-solid fa-trash"></i>
+                          <span class="visually-hidden">Удалить</span>
                         </button>
                       </div>
                     </li>
@@ -306,10 +318,12 @@
                           <span>{{ file.filename }}</span>
                           <div class="btn-group btn-group-sm">
                             <button type="button" class="btn btn-outline-secondary" (click)="downloadFile(file)">
-                              <i class="bi bi-download"></i>
+                              <i class="fa-solid fa-download"></i>
+                              <span class="visually-hidden">Скачать</span>
                             </button>
                             <button type="button" class="btn btn-outline-danger" (click)="deleteFile(file)">
-                              <i class="bi bi-trash"></i>
+                              <i class="fa-solid fa-trash"></i>
+                              <span class="visually-hidden">Удалить</span>
                             </button>
                           </div>
                         </li>
@@ -340,7 +354,8 @@
                         <div class="text-muted small">Целевой объект: #{{ link.targetId }} · Тип: {{ link.direction }}</div>
                       </div>
                       <button type="button" class="btn btn-outline-danger btn-sm" (click)="deleteLink(link)" [disabled]="isLinkActionInProgress">
-                        <i class="bi bi-trash"></i>
+                        <i class="fa-solid fa-trash"></i>
+                        <span class="visually-hidden">Удалить связь</span>
                       </button>
                     </li>
                   </ul>
@@ -388,6 +403,7 @@
                   <div class="col-12 text-end">
                     <button type="submit" class="btn btn-primary" [disabled]="linkForm.invalid || isLinkActionInProgress">
                       <span *ngIf="isLinkActionInProgress" class="spinner-border spinner-border-sm me-1"></span>
+                      <i class="fa-solid fa-link me-1"></i>
                       Создать связь
                     </button>
                   </div>

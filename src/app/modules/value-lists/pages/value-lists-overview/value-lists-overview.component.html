@@ -1,18 +1,24 @@
-<div class="container-fluid py-4">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-    <div>
+<section class="container-fluid py-4 value-lists-page">
+  <header class="page-header">
+    <div class="page-header__title">
       <h1 class="h3 mb-1">Справочники значений</h1>
-      <p class="text-muted mb-0">Структурируйте значения для свойств и управляйте иерархиями списков</p>
+      <p class="text-muted mb-0 page-header__description">Структурируйте значения для свойств и управляйте иерархиями списков</p>
     </div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
-        <i class="bi bi-arrow-repeat me-1"></i>Обновить
+    <div class="page-header__actions">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="refresh()">
+        <i class="fa-solid fa-rotate-right me-1"></i>Обновить
       </button>
-      <button class="btn btn-primary" type="button" (click)="startCreate()">
-        <i class="bi bi-plus-lg me-1"></i>Новый справочник
+      <button
+        type="button"
+        class="btn-sm"
+        [ngClass]="listPrimaryButtonClasses"
+        (click)="handleListPrimaryAction()"
+      >
+        <i class="fa-fw" [ngClass]="listPrimaryButtonIcon"></i>
+        <span class="ms-2">{{ listPrimaryButtonLabel }}</span>
       </button>
     </div>
-  </div>
+  </header>
 
   <div *ngIf="message$ | async as message" class="alert" [ngClass]="message.type === 'success' ? 'alert-success' : 'alert-danger'">
     {{ message.text }}
@@ -66,7 +72,7 @@
             (click)="deleteList(selected)"
             [disabled]="deletingListId === selected.id"
           >
-            <i class="bi bi-trash"></i> Удалить
+            <i class="fa-solid fa-trash me-1"></i>Удалить
           </button>
         </div>
       </div>
@@ -74,40 +80,66 @@
 
     <div class="col-12 col-xl-7 mt-4 mt-xl-0">
       <div class="d-flex flex-column gap-4">
-        <div class="card border-0 anubis-shadow">
-          <div class="card-header bg-white">
-            <h2 class="h5 mb-0">{{ (selectedList$ | async)?.name ?? 'Новый справочник' }}</h2>
-          </div>
-          <div class="card-body">
-            <form [formGroup]="listForm" class="row g-3" (ngSubmit)="saveList()">
-            <div class="col-12">
-              <label class="form-label">Название</label>
-              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="listForm.get('name')?.invalid && listForm.get('name')?.touched" />
-              <div class="invalid-feedback">Укажите название справочника.</div>
-            </div>
-            <div class="col-12 col-md-4">
-              <div class="form-check form-switch mt-4">
-                <input class="form-check-input" type="checkbox" id="listActive" formControlName="isActive" />
-                <label class="form-check-label" for="listActive">
-                  {{ listForm.get('isActive')?.value ? 'Активен' : 'Выключен' }}
-                </label>
+        <ng-container *ngIf="isListFormOpen; else listFormPlaceholder">
+          <div class="card border-0 anubis-shadow" [ngClass]="{ 'border-success': listForm.valid }">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <div>
+                <h2 class="h5 mb-0">{{ (selectedList$ | async)?.name ?? 'Новый справочник' }}</h2>
+                <p class="text-muted small mb-0">
+                  {{ (selectedList$ | async) ? 'Редактирование выбранного списка' : 'Создание нового списка значений' }}
+                </p>
               </div>
-            </div>
-            <div class="col-12">
-              <label class="form-label">Локализации (JSON)</label>
-              <textarea class="form-control" rows="3" formControlName="nameI18n" placeholder='{"ru":"Название"}'></textarea>
-            </div>
-            <div class="col-12 d-flex gap-2">
-              <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSavingList">
-                {{ (selectedList$ | async) ? 'Сохранить изменения' : 'Создать справочник' }}
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closeListForm()">
+                <i class="fa-solid fa-xmark me-1"></i>Скрыть
               </button>
-              <button type="button" class="btn btn-outline-secondary flex-fill" (click)="startCreate()">Очистить</button>
             </div>
-          </form>
-        </div>
-        </div>
+            <div class="card-body">
+              <form [formGroup]="listForm" class="row g-3" (ngSubmit)="saveList()">
+                <div class="col-12">
+                  <label class="form-label" for="valueListName">Название</label>
+                  <input
+                    id="valueListName"
+                    type="text"
+                    class="form-control"
+                    formControlName="name"
+                    [class.is-invalid]="listForm.get('name')?.invalid && listForm.get('name')?.touched"
+                  />
+                  <div class="invalid-feedback">Укажите название справочника.</div>
+                </div>
+                <div class="col-12 col-md-4 d-flex align-items-center">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="listActive" formControlName="isActive" />
+                    <label class="form-check-label" for="listActive">
+                      {{ listForm.get('isActive')?.value ? 'Активен' : 'Выключен' }}
+                    </label>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="valueListLocales">Локализации (JSON)</label>
+                  <textarea
+                    id="valueListLocales"
+                    class="form-control"
+                    rows="3"
+                    formControlName="nameI18n"
+                    placeholder='{"ru":"Название"}'
+                  ></textarea>
+                </div>
+                <div class="col-12 d-flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-success flex-fill" [disabled]="isSavingList || listForm.invalid">
+                    <i class="fa-solid" [ngClass]="(selectedList$ | async) ? 'fa-floppy-disk' : 'fa-plus'"></i>
+                    <span class="ms-2">{{ (selectedList$ | async) ? 'Сохранить изменения' : 'Создать справочник' }}</span>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary flex-fill" (click)="startCreate()">
+                    <i class="fa-solid fa-eraser"></i>
+                    <span class="ms-2">Очистить</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ng-container>
 
-        <div class="card border-0 anubis-shadow" *ngIf="(selectedList$ | async) as selected">
+        <div class="card border-0 anubis-shadow" *ngIf="isListFormOpen && (selectedList$ | async) as selected">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <div>
               <h2 class="h6 mb-0">Элементы списка</h2>
@@ -144,7 +176,10 @@
                 </div>
               </div>
               <div class="col-12">
-                <button type="submit" class="btn btn-outline-primary" [disabled]="isSavingItem">Добавить значение</button>
+                <button type="submit" class="btn btn-outline-primary" [disabled]="isSavingItem">
+                  <i class="fa-solid fa-plus"></i>
+                  <span class="ms-2">Добавить значение</span>
+                </button>
               </div>
             </form>
           </div>
@@ -173,7 +208,8 @@
                   <td class="text-end">
                     <div class="btn-group btn-group-sm">
                       <button class="btn btn-outline-secondary" type="button" (click)="deactivateItem(item)">
-                        <i class="bi bi-slash-circle"></i>
+                        <i class="fa-solid fa-ban"></i>
+                        <span class="visually-hidden">Деактивировать</span>
                       </button>
                       <button
                         class="btn btn-outline-danger"
@@ -181,7 +217,8 @@
                         [disabled]="deletingItemId === item.id"
                         (click)="deleteItem(item)"
                       >
-                        <i class="bi bi-trash"></i>
+                        <i class="fa-solid fa-trash"></i>
+                        <span class="visually-hidden">Удалить</span>
                       </button>
                     </div>
                   </td>
@@ -194,6 +231,14 @@
           </div>
         </div>
       </div>
+      <ng-template #listFormPlaceholder>
+        <div class="card border-0 anubis-shadow placeholder-card">
+          <div class="card-body text-center py-5">
+            <i class="fa-solid fa-list-check display-5 text-primary"></i>
+            <p class="mt-3 mb-0 text-muted">Нажмите «Новый справочник», чтобы открыть форму создания.</p>
+          </div>
+        </div>
+      </ng-template>
     </div>
   </div>
-</div>
+</section>

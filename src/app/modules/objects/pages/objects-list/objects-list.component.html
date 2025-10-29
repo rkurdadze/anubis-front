@@ -1,16 +1,16 @@
 <section class="objects-list">
-  <header class="page-header d-flex flex-wrap gap-3 align-items-center justify-content-between mb-4">
-    <div>
+  <header class="page-header">
+    <div class="page-header__title">
       <h1 class="h3 mb-1">Объекты хранилища</h1>
-      <p class="text-muted mb-0">Управляйте объектами, их типами и состояниями. Здесь доступны фильтры, быстрые действия и создание новых записей.</p>
+      <p class="text-muted mb-0 page-header__description">Управляйте объектами, их типами и состояниями. Здесь доступны фильтры, быстрые действия и создание новых записей.</p>
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="page-header__actions">
       <button type="button" class="btn btn-outline-secondary" (click)="refresh()" [disabled]="isPerformingAction">
-        <i class="bi bi-arrow-repeat me-1"></i>
+        <i class="fa-solid fa-rotate-right me-1"></i>
         Обновить
       </button>
       <button type="button" class="btn btn-primary" (click)="toggleCreatePanel()">
-        <i class="bi" [ngClass]="isCreatePanelOpen ? 'bi-dash-lg' : 'bi-plus-lg'"></i>
+        <i class="fa-fw" [ngClass]="isCreatePanelOpen ? 'fa-solid fa-minus' : 'fa-solid fa-plus'"></i>
         <span class="ms-2">{{ isCreatePanelOpen ? 'Скрыть форму' : 'Новый объект' }}</span>
       </button>
     </div>
@@ -29,7 +29,7 @@
         <div class="col-md-4">
           <label for="objects-search" class="form-label">Поиск</label>
           <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
             <input
               id="objects-search"
               type="search"
@@ -112,9 +112,12 @@
           </select>
         </div>
         <div class="col-12 d-flex justify-content-end gap-2 mt-3">
-          <button type="button" class="btn btn-outline-secondary" (click)="toggleCreatePanel()">Отмена</button>
+          <button type="button" class="btn btn-outline-secondary" (click)="toggleCreatePanel()">
+            <i class="fa-solid fa-ban me-1"></i>
+            Отмена
+          </button>
           <button type="submit" class="btn btn-primary" [disabled]="isPerformingAction || createForm.invalid">
-            <i class="bi bi-check-lg me-1"></i>
+            <i class="fa-solid fa-floppy-disk me-1"></i>
             Создать объект
           </button>
         </div>
@@ -146,12 +149,16 @@
               <tbody>
                 <tr
                   *ngFor="let object of objects; trackBy: trackByObjectId"
-                  class="position-relative"
                   [ngClass]="{'table-danger': object.isDeleted}"
                 >
                   <td class="text-muted fw-semibold">#{{ object.id }}</td>
-                  <td class="fw-semibold">
-                    <a class="stretched-link" [routerLink]="['/objects', object.id]">{{ object.name }}</a>
+                  <td class="fw-semibold position-relative">
+                    <a
+                      class="stretched-link text-reset text-decoration-none"
+                      [routerLink]="['/objects', object.id]"
+                    >
+                      {{ object.name }}
+                    </a>
                   </td>
                   <td>{{ object.typeName }}</td>
                   <td>{{ object.className }}</td>
@@ -168,21 +175,34 @@
                     </span>
                   </td>
                   <td class="text-end">
-                    <div class="btn-group btn-group-sm" role="group">
-                      <button type="button" class="btn btn-outline-primary" (click)="cloneObject(object)" [disabled]="isPerformingAction">
-                        <i class="bi bi-files"></i>
+                    <div class="action-buttons">
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary btn-icon"
+                        (click)="cloneObject(object)"
+                        [disabled]="isPerformingAction"
+                      >
+                        <i class="fa-solid fa-copy"></i>
+                        <span class="visually-hidden">Дублировать</span>
                       </button>
                       <button
                         type="button"
-                        class="btn btn-outline-warning"
+                        class="btn btn-outline-warning btn-icon"
                         (click)="softDelete(object)"
                         [disabled]="isPerformingAction || object.isDeleted"
                         title="Мягкое удаление"
                       >
-                        <i class="bi bi-archive"></i>
+                        <i class="fa-solid fa-box-archive"></i>
+                        <span class="visually-hidden">Архивировать</span>
                       </button>
-                      <button type="button" class="btn btn-outline-danger" (click)="hardDelete(object)" [disabled]="isPerformingAction">
-                        <i class="bi bi-trash"></i>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger btn-icon"
+                        (click)="hardDelete(object)"
+                        [disabled]="isPerformingAction"
+                      >
+                        <i class="fa-solid fa-trash"></i>
+                        <span class="visually-hidden">Удалить</span>
                       </button>
                     </div>
                   </td>
@@ -197,7 +217,7 @@
 
   <ng-template #emptyState>
     <div class="text-center py-5">
-      <i class="bi bi-inboxes display-5 text-muted"></i>
+      <i class="fa-solid fa-inbox display-5 text-muted"></i>
       <p class="text-muted mt-3 mb-1">Объекты не найдены.</p>
       <p class="text-muted">Попробуйте изменить фильтры или создать новый объект.</p>
     </div>

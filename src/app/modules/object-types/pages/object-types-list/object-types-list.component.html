@@ -1,31 +1,42 @@
-<div class="container-fluid py-4">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-    <div>
+<section class="container-fluid py-4 object-types-page">
+  <header class="page-header">
+    <div class="page-header__title">
       <h1 class="h3 mb-1">Типы объектов</h1>
-      <p class="text-muted mb-0">Управление типами объектов и быстрый поиск по ним</p>
+      <p class="text-muted mb-0 page-header__description">Управление типами объектов и быстрый поиск по ним</p>
     </div>
-    <form [formGroup]="filterForm" class="search-box" (ngSubmit)="$event.preventDefault()">
-      <i class="bi bi-search"></i>
-      <input
-        type="search"
-        class="form-control"
-        placeholder="Поиск по названию или идентификатору"
-        formControlName="search"
-      />
-    </form>
-  </div>
+    <div class="page-header__actions">
+      <form [formGroup]="filterForm" class="search-box" (ngSubmit)="$event.preventDefault()">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input
+          type="search"
+          class="form-control"
+          placeholder="Поиск по названию или идентификатору"
+          formControlName="search"
+        />
+      </form>
+      <button
+        type="button"
+        class="btn-sm"
+        [ngClass]="typePrimaryButtonClasses"
+        (click)="handleTypePrimaryAction()"
+      >
+        <i class="fa-fw" [ngClass]="typePrimaryButtonIcon"></i>
+        <span class="ms-2">{{ typePrimaryButtonLabel }}</span>
+      </button>
+    </div>
+  </header>
 
   <div *ngIf="message$ | async as message" class="alert" [ngClass]="message.type === 'success' ? 'alert-success' : 'alert-danger'">
     {{ message.text }}
   </div>
 
-  <div class="row g-4">
+  <div class="row g-4 align-items-start">
     <div class="col-12 col-lg-7">
       <div class="card border-0 anubis-shadow h-100">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
           <h2 class="h5 mb-0">Список типов</h2>
           <button class="btn btn-outline-secondary btn-sm" type="button" (click)="refresh()">
-            <i class="bi bi-arrow-repeat me-1"></i>Обновить
+            <i class="fa-solid fa-rotate-right me-1"></i>Обновить
           </button>
         </div>
         <div class="table-responsive">
@@ -44,7 +55,8 @@
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
                     <button type="button" class="btn btn-outline-primary" (click)="startEdit(type)">
-                      <i class="bi bi-pencil"></i>
+                      <i class="fa-solid fa-pen"></i>
+                      <span class="visually-hidden">Редактировать</span>
                     </button>
                     <button
                       type="button"
@@ -52,7 +64,8 @@
                       [disabled]="deletingId === type.id"
                       (click)="delete(type)"
                     >
-                      <i class="bi bi-trash"></i>
+                      <i class="fa-solid fa-trash"></i>
+                      <span class="visually-hidden">Удалить</span>
                     </button>
                   </div>
                 </td>
@@ -67,28 +80,47 @@
     </div>
 
     <div class="col-12 col-lg-5 mt-4 mt-lg-0">
-      <div class="card border-0 anubis-shadow">
-        <div class="card-header bg-white">
-          <h2 class="h5 mb-0">{{ editingType ? 'Редактирование типа' : 'Новый тип объекта' }}</h2>
-        </div>
-        <div class="card-body">
-          <form [formGroup]="typeForm" class="d-flex flex-column gap-3" (ngSubmit)="submit()">
+      <ng-container *ngIf="isTypeFormOpen; else typeFormPlaceholder">
+        <div class="card border-0 anubis-shadow">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <div>
-              <label class="form-label">Название</label>
-              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="typeForm.get('name')?.invalid && typeForm.get('name')?.touched" />
-              <div class="invalid-feedback">Введите название типа.</div>
+              <h2 class="h5 mb-0">{{ editingType ? 'Редактирование типа' : 'Новый тип объекта' }}</h2>
+              <p class="text-muted small mb-0" *ngIf="!editingType">Заполните форму для создания нового типа объектов</p>
+              <p class="text-muted small mb-0" *ngIf="editingType">Измените параметры выбранного типа</p>
             </div>
-            <div class="d-flex gap-2">
-              <button type="submit" class="btn btn-primary flex-fill" [disabled]="isProcessing">
-                {{ editingType ? 'Сохранить изменения' : 'Создать тип' }}
-              </button>
-              <button type="button" class="btn btn-outline-secondary flex-fill" (click)="cancelEdit()">
-                {{ editingType ? 'Отменить' : 'Очистить' }}
-              </button>
-            </div>
-          </form>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelEdit()">
+              <i class="fa-solid fa-xmark me-1"></i>Скрыть
+            </button>
+          </div>
+          <div class="card-body">
+            <form [formGroup]="typeForm" class="d-flex flex-column gap-3" (ngSubmit)="submit()">
+              <div>
+                <label class="form-label">Название</label>
+                <input type="text" class="form-control" formControlName="name" [class.is-invalid]="typeForm.get('name')?.invalid && typeForm.get('name')?.touched" />
+                <div class="invalid-feedback">Введите название типа.</div>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-primary flex-fill" [disabled]="isProcessing">
+                  <i class="fa-solid" [ngClass]="editingType ? 'fa-floppy-disk' : 'fa-plus'"></i>
+                  <span class="ms-2">{{ editingType ? 'Сохранить изменения' : 'Создать тип' }}</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" (click)="cancelEdit()">
+                  <i class="fa-solid fa-ban"></i>
+                  <span class="ms-2">{{ editingType ? 'Отменить изменения' : 'Отменить создание' }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      </ng-container>
+      <ng-template #typeFormPlaceholder>
+        <div class="card border-0 anubis-shadow placeholder-card">
+          <div class="card-body text-center py-5">
+            <i class="fa-solid fa-diagram-project display-5 text-primary"></i>
+            <p class="mt-3 mb-0 text-muted">Нажмите «Новый тип объекта», чтобы открыть форму создания.</p>
+          </div>
+        </div>
+      </ng-template>
     </div>
   </div>
-</div>
+</section>

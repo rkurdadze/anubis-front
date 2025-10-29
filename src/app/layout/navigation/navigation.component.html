@@ -1,6 +1,23 @@
 <nav class="app-nav d-flex flex-column bg-dark text-white">
-  <div class="brand px-4 py-4 border-bottom border-secondary-subtle">
-    <div class="h5 mb-0">Anubis</div>
+  <div class="brand px-4 py-4 border-bottom border-secondary-subtle text-center">
+    <div class="brand__logo d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 p-3">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 64 64"
+        width="48"
+        height="48"
+        role="img"
+        aria-labelledby="anubis-logo-title"
+        class="text-primary"
+      >
+        <title id="anubis-logo-title">Anubis</title>
+        <path
+          fill="currentColor"
+          d="M31.95 7.5c-2.88 0-5.23 2.06-5.54 4.82l-.88 7.52-6.33-3.42a2.5 2.5 0 0 0-3.34 1.02l-1.79 3.37a2.5 2.5 0 0 0 .58 3.05l5.57 4.98-3.4 5.89a9 9 0 0 0-1.23 4.52v7.27a4 4 0 0 0 2.35 3.64l8.32 3.64V56a2 2 0 0 0 2 2h10.4a2 2 0 0 0 2-2v-2.2l8.32-3.64A4 4 0 0 0 52 44.6v-7.27a9 9 0 0 0-1.22-4.52l-3.4-5.89 5.57-4.98a2.5 2.5 0 0 0 .58-3.05l-1.79-3.37a2.5 2.5 0 0 0-3.34-1.02l-6.33 3.42-.88-7.52c-.31-2.76-2.66-4.82-5.54-4.82h-.1Z"
+        />
+      </svg>
+    </div>
+    <div class="text-uppercase fw-bold fs-5 mt-3">ANUBIS</div>
     <small class="text-secondary">Digital Vault</small>
   </div>
   <ul class="nav flex-column py-3">
@@ -11,7 +28,7 @@
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
       >
-        <i class="bi" [ngClass]="item.icon"></i>
+        <i class="fa-fw" [ngClass]="item.icon"></i>
         <span>{{ item.label }}</span>
       </a>
     </li>

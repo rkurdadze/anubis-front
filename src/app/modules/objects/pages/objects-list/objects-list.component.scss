@@ -1,14 +1,4 @@
 .objects-list {
-  .page-header {
-    background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(32, 201, 151, 0.08));
-    border-radius: 0.75rem;
-    padding: 1.5rem 1.75rem;
-
-    h1 {
-      font-weight: 600;
-    }
-  }
-
   .card {
     box-shadow: 0 0.5rem 1rem rgba(15, 23, 42, 0.05);
     border: none;
@@ -59,8 +49,23 @@
     }
   }
 
-  .btn-group .btn {
-    min-width: 2.25rem;
+  .action-buttons {
+    display: inline-flex;
+    gap: 0.5rem;
+  }
+
+  .btn-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 0.75rem;
+  }
+
+  .btn-icon i {
+    font-size: 1.05rem;
   }
 
   .invalid-feedback {
@@ -70,10 +75,6 @@
 
 @media (max-width: 991.98px) {
   .objects-list {
-    .page-header {
-      padding: 1.25rem;
-    }
-
     .card {
       border-radius: 0.5rem;
     }

@@ -1,24 +1,30 @@
-<div class="container-fluid py-4">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-    <div>
+<section class="container-fluid py-4 properties-page">
+  <header class="page-header">
+    <div class="page-header__title">
       <h1 class="h3 mb-1">Свойства и метаданные</h1>
-      <p class="text-muted mb-0">Определяйте свойства, их типы данных и связи со справочниками</p>
+      <p class="text-muted mb-0 page-header__description">Определяйте свойства, их типы данных и связи со справочниками</p>
     </div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
-        <i class="bi bi-arrow-repeat me-1"></i>Обновить
+    <div class="page-header__actions">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="refresh()">
+        <i class="fa-solid fa-rotate-right me-1"></i>Обновить
       </button>
-      <button class="btn btn-primary" type="button" (click)="startCreate()">
-        <i class="bi bi-plus-lg me-1"></i>Новое свойство
+      <button
+        type="button"
+        class="btn-sm"
+        [ngClass]="propertyPrimaryButtonClasses"
+        (click)="handlePropertyPrimaryAction()"
+      >
+        <i class="fa-fw" [ngClass]="propertyPrimaryButtonIcon"></i>
+        <span class="ms-2">{{ propertyPrimaryButtonLabel }}</span>
       </button>
     </div>
-  </div>
+  </header>
 
   <div *ngIf="message$ | async as message" class="alert" [ngClass]="message.type === 'success' ? 'alert-success' : 'alert-danger'">
     {{ message.text }}
   </div>
 
-  <div class="row g-4">
+  <div class="row g-4 align-items-start">
     <div class="col-12 col-xl-6">
       <div class="card border-0 anubis-shadow h-100">
         <div class="card-header bg-white">
@@ -71,13 +77,16 @@
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
                     <button class="btn btn-outline-secondary" type="button" (click)="startEdit(property)">
-                      <i class="bi bi-pencil"></i>
+                      <i class="fa-solid fa-pen"></i>
+                      <span class="visually-hidden">Редактировать</span>
                     </button>
                     <button class="btn btn-outline-warning" type="button" (click)="deactivateProperty(property)" [disabled]="isDeactivatingId === property.id">
-                      <i class="bi bi-slash-circle"></i>
+                      <i class="fa-solid fa-ban"></i>
+                      <span class="visually-hidden">Деактивировать</span>
                     </button>
                     <button class="btn btn-outline-danger" type="button" (click)="deleteProperty(property)" [disabled]="isDeletingId === property.id">
-                      <i class="bi bi-trash"></i>
+                      <i class="fa-solid fa-trash"></i>
+                      <span class="visually-hidden">Удалить</span>
                     </button>
                   </div>
                 </td>
@@ -92,72 +101,113 @@
     </div>
 
     <div class="col-12 col-xl-6 mt-4 mt-xl-0">
-      <div class="card border-0 anubis-shadow">
-        <div class="card-header bg-white">
-          <h2 class="h5 mb-0">{{ editingProperty ? 'Редактирование свойства' : 'Новое свойство' }}</h2>
+      <ng-container *ngIf="isPropertyFormOpen; else propertyFormPlaceholder">
+        <div class="card border-0 anubis-shadow" [ngClass]="{ 'border-success': propertyForm.valid }">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+              <h2 class="h5 mb-0">{{ editingProperty ? 'Редактирование свойства' : 'Новое свойство' }}</h2>
+              <p class="text-muted small mb-0">
+                {{ editingProperty ? 'Обновите параметры существующего свойства' : 'Заполните форму для создания нового свойства' }}
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closePropertyForm()">
+              <i class="fa-solid fa-xmark me-1"></i>Скрыть
+            </button>
+          </div>
+          <div class="card-body">
+            <form [formGroup]="propertyForm" class="row g-3" (ngSubmit)="saveProperty()">
+              <div class="col-12">
+                <label class="form-label" for="propertyName">Название</label>
+                <input
+                  id="propertyName"
+                  type="text"
+                  class="form-control"
+                  formControlName="name"
+                  [class.is-invalid]="propertyForm.get('name')?.invalid && propertyForm.get('name')?.touched"
+                />
+                <div class="invalid-feedback">Укажите название свойства.</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="propertyType">Тип данных</label>
+                <select id="propertyType" class="form-select" formControlName="dataType">
+                  <option *ngFor="let type of dataTypes" [ngValue]="type">{{ type }}</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="propertyValueList">Справочник</label>
+                <select
+                  id="propertyValueList"
+                  class="form-select"
+                  formControlName="valueListId"
+                  [disabled]="propertyForm.get('dataType')?.value !== 'VALUELIST' && propertyForm.get('dataType')?.value !== 'MULTI_VALUELIST'"
+                >
+                  <option [ngValue]="null">Не выбрано</option>
+                  <option *ngFor="let list of valueLists$ | async" [ngValue]="list.id">{{ list.name }}</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="propertyObjectType">Связанный тип объекта</label>
+                <select id="propertyObjectType" class="form-select" formControlName="refObjectTypeId">
+                  <option [ngValue]="null">Не указан</option>
+                  <option *ngFor="let type of objectTypes$ | async" [ngValue]="type.id">{{ type.name }}</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="propertyRegex">Регулярное выражение</label>
+                <input id="propertyRegex" type="text" class="form-control" formControlName="regex" placeholder="Опционально" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="propertyDefault">Значение по умолчанию</label>
+                <input id="propertyDefault" type="text" class="form-control" formControlName="defaultValue" />
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="form-check-group">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="required" formControlName="isRequired" />
+                    <label class="form-check-label" for="required">Обязательное</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="unique" formControlName="isUnique" />
+                    <label class="form-check-label" for="unique">Уникальное</label>
+                  </div>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="multiselect"
+                      formControlName="isMultiselect"
+                      [disabled]="propertyForm.get('dataType')?.value === 'MULTI_VALUELIST'"
+                    />
+                    <label class="form-check-label" for="multiselect">Множественный выбор</label>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="propertyDescription">Описание</label>
+                <textarea id="propertyDescription" class="form-control" rows="3" formControlName="description"></textarea>
+              </div>
+              <div class="col-12 d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-success flex-fill" [disabled]="isSaving || propertyForm.invalid">
+                  <i class="fa-solid" [ngClass]="editingProperty ? 'fa-floppy-disk' : 'fa-plus'"></i>
+                  <span class="ms-2">{{ editingProperty ? 'Сохранить изменения' : 'Создать свойство' }}</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" (click)="startCreate()">
+                  <i class="fa-solid fa-eraser"></i>
+                  <span class="ms-2">Очистить</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-        <div class="card-body">
-          <form [formGroup]="propertyForm" class="row g-3" (ngSubmit)="saveProperty()">
-            <div class="col-12">
-              <label class="form-label">Название</label>
-              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="propertyForm.get('name')?.invalid && propertyForm.get('name')?.touched" />
-              <div class="invalid-feedback">Укажите название свойства.</div>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Тип данных</label>
-              <select class="form-select" formControlName="dataType">
-                <option *ngFor="let type of dataTypes" [ngValue]="type">{{ type }}</option>
-              </select>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Справочник</label>
-              <select class="form-select" formControlName="valueListId" [disabled]="propertyForm.get('dataType')?.value !== 'VALUELIST' && propertyForm.get('dataType')?.value !== 'MULTI_VALUELIST'">
-                <option [ngValue]="null">Не выбрано</option>
-                <option *ngFor="let list of valueLists$ | async" [ngValue]="list.id">{{ list.name }}</option>
-              </select>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Связанный тип объекта</label>
-              <select class="form-select" formControlName="refObjectTypeId">
-                <option [ngValue]="null">Не указан</option>
-                <option *ngFor="let type of objectTypes$ | async" [ngValue]="type.id">{{ type.name }}</option>
-              </select>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Регулярное выражение</label>
-              <input type="text" class="form-control" formControlName="regex" placeholder="Опционально" />
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Значение по умолчанию</label>
-              <input type="text" class="form-control" formControlName="defaultValue" />
-            </div>
-            <div class="col-12 col-md-6 d-flex align-items-center">
-              <div class="form-check me-3">
-                <input class="form-check-input" type="checkbox" id="required" formControlName="isRequired" />
-                <label class="form-check-label" for="required">Обязательное</label>
-              </div>
-              <div class="form-check me-3">
-                <input class="form-check-input" type="checkbox" id="unique" formControlName="isUnique" />
-                <label class="form-check-label" for="unique">Уникальное</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="multiselect" formControlName="isMultiselect" [disabled]="propertyForm.get('dataType')?.value === 'MULTI_VALUELIST'" />
-                <label class="form-check-label" for="multiselect">Множественный выбор</label>
-              </div>
-            </div>
-            <div class="col-12">
-              <label class="form-label">Описание</label>
-              <textarea class="form-control" rows="3" formControlName="description"></textarea>
-            </div>
-            <div class="col-12 d-flex gap-2">
-              <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
-                {{ editingProperty ? 'Сохранить изменения' : 'Создать свойство' }}
-              </button>
-              <button type="button" class="btn btn-outline-secondary flex-fill" (click)="startCreate()">Очистить</button>
-            </div>
-          </form>
+      </ng-container>
+      <ng-template #propertyFormPlaceholder>
+        <div class="card border-0 anubis-shadow placeholder-card">
+          <div class="card-body text-center py-5">
+            <i class="fa-solid fa-plus-circle display-5 text-primary"></i>
+            <p class="mt-3 mb-0 text-muted">Нажмите «Новое свойство», чтобы открыть форму создания.</p>
+          </div>
         </div>
-      </div>
+      </ng-template>
     </div>
   </div>
-</div>
+</section>
