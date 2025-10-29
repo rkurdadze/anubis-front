@@ -72,6 +72,7 @@ export class ObjectTypesListComponent implements OnDestroy {
   editingType: ObjectType | null = null;
   isProcessing = false;
   deletingId: number | null = null;
+  isTypeFormOpen = false;
 
   constructor() {
     this.filterForm.valueChanges.pipe(takeUntil(this.destroy$)).subscribe();
@@ -92,15 +93,48 @@ export class ObjectTypesListComponent implements OnDestroy {
   startCreate(): void {
     this.editingType = null;
     this.typeForm.reset({ name: '' });
+    this.isTypeFormOpen = true;
   }
 
   startEdit(type: ObjectType): void {
     this.editingType = type;
     this.typeForm.reset({ name: type.name });
+    this.isTypeFormOpen = true;
   }
 
   cancelEdit(): void {
-    this.startCreate();
+    this.editingType = null;
+    this.typeForm.reset({ name: '' });
+    this.isTypeFormOpen = false;
+  }
+
+  get typePrimaryButtonLabel(): string {
+    if (!this.isTypeFormOpen) {
+      return 'Новый тип объекта';
+    }
+    return 'Сохранить тип';
+  }
+
+  get typePrimaryButtonIcon(): string {
+    if (!this.isTypeFormOpen) {
+      return 'bi-plus-lg';
+    }
+    return this.typeForm.valid ? 'bi-check-lg' : 'bi-pencil';
+  }
+
+  get typePrimaryButtonClasses(): string {
+    if (!this.isTypeFormOpen) {
+      return 'btn btn-primary';
+    }
+    return this.typeForm.valid ? 'btn btn-success' : 'btn btn-outline-primary';
+  }
+
+  handleTypePrimaryAction(): void {
+    if (!this.isTypeFormOpen) {
+      this.startCreate();
+      return;
+    }
+    this.submit();
   }
 
   submit(): void {
@@ -167,7 +201,7 @@ export class ObjectTypesListComponent implements OnDestroy {
           this.setMessage({ type: 'success', text: `Тип «${type.name}» удалён.` });
           this.refresh();
           if (this.editingType?.id === type.id) {
-            this.startCreate();
+            this.cancelEdit();
           }
           this.deletingId = null;
         },

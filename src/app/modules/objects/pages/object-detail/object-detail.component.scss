@@ -4,15 +4,78 @@
     padding-bottom: 0.5rem;
   }
 
+  .card {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 1.25rem 2.5rem rgba(15, 23, 42, 0.08);
+    background-color: #fff;
+  }
+
+  .card-header {
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+  }
+
   .properties-form {
     .card {
-      border-color: var(--bs-border-color-translucent);
+      box-shadow: none;
+      border: 1px solid var(--bs-border-color-translucent) !important;
     }
   }
 
   .nav-tabs {
+    border-bottom: none;
+    gap: 0.5rem;
+
     .nav-link {
       cursor: pointer;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      color: rgba(31, 34, 51, 0.7);
+      font-weight: 500;
+      padding: 0.5rem 1.25rem;
+
+      &.active {
+        background-color: var(--anubis-primary);
+        border-color: var(--anubis-primary);
+        color: #fff;
+        box-shadow: 0 0.5rem 1.5rem rgba(50, 45, 92, 0.25);
+      }
     }
+  }
+
+  .list-group-item {
+    border-color: var(--bs-border-color-translucent);
+  }
+
+  .btn-group .btn,
+  .btn-group-sm .btn {
+    border-radius: 0.5rem;
+  }
+
+  .list-group-item {
+    border-color: var(--bs-border-color-translucent);
+  }
+
+  .btn-group .btn,
+  .btn-group-sm .btn {
+    border-radius: 0.5rem;
+  }
+
+  .list-group-item {
+    border-color: var(--bs-border-color-translucent);
+  }
+
+  .btn-group .btn,
+  .btn-group-sm .btn {
+    border-radius: 0.5rem;
+  }
+
+  .list-group-item {
+    border-color: var(--bs-border-color-translucent);
+  }
+
+  .btn-group .btn,
+  .btn-group-sm .btn {
+    border-radius: 0.5rem;
   }
 }

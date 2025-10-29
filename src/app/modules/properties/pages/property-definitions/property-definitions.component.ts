@@ -35,6 +35,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
   private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
   private messageTimeoutHandle: number | null = null;
   editingProperty: PropertyDefinition | null = null;
+  isPropertyFormOpen = false;
 
   readonly dataTypes = Object.values(PropertyDataType);
 
@@ -152,6 +153,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       defaultValue: '',
       description: ''
     });
+    this.isPropertyFormOpen = true;
   }
 
   startEdit(property: PropertyDefinition): void {
@@ -168,6 +170,41 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       defaultValue: property.defaultValue ?? '',
       description: property.description ?? ''
     });
+    this.isPropertyFormOpen = true;
+  }
+
+  closePropertyForm(): void {
+    this.editingProperty = null;
+    this.isPropertyFormOpen = false;
+  }
+
+  get propertyPrimaryButtonLabel(): string {
+    if (!this.isPropertyFormOpen) {
+      return 'Новое свойство';
+    }
+    return 'Сохранить свойство';
+  }
+
+  get propertyPrimaryButtonIcon(): string {
+    if (!this.isPropertyFormOpen) {
+      return 'bi-plus-lg';
+    }
+    return this.propertyForm.valid ? 'bi-check-lg' : 'bi-pencil';
+  }
+
+  get propertyPrimaryButtonClasses(): string {
+    if (!this.isPropertyFormOpen) {
+      return 'btn btn-primary';
+    }
+    return this.propertyForm.valid ? 'btn btn-success' : 'btn btn-outline-primary';
+  }
+
+  handlePropertyPrimaryAction(): void {
+    if (!this.isPropertyFormOpen) {
+      this.startCreate();
+      return;
+    }
+    this.saveProperty();
   }
 
   saveProperty(): void {

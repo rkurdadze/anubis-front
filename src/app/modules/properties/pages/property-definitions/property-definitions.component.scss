@@ -20,3 +20,11 @@
   align-items: center;
   gap: 0.5rem;
 }
+
+.placeholder-card {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}

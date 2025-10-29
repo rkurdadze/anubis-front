@@ -1,6 +1,13 @@
+:host {
+  display: flex;
+  flex: 0 0 280px;
+  align-self: stretch;
+}
+
 .app-nav {
-  width: 280px;
+  width: 100%;
   min-height: 100vh;
+  height: 100%;
 }
 
 .nav-link {

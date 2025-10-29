@@ -32,6 +32,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
   private messageTimeoutHandle: number | null = null;
   selectedView: ObjectView | null = null;
+  isViewFormOpen = false;
 
   readonly views$ = this.viewsSubject.asObservable();
   readonly executionResults$ = this.resultsSubject.asObservable();
@@ -92,11 +93,46 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
 
   selectView(view: ObjectView): void {
     this.applySelection(view);
+    this.isViewFormOpen = true;
   }
 
   createView(): void {
     this.selectedView = null;
     this.viewForm.reset({ name: '', isCommon: false, sortOrder: 0, filterJson: '', groupingsJson: '' });
+    this.isViewFormOpen = true;
+  }
+
+  closeViewForm(): void {
+    this.resetForm();
+  }
+
+  get viewPrimaryButtonLabel(): string {
+    if (!this.isViewFormOpen) {
+      return 'Новое представление';
+    }
+    return 'Сохранить представление';
+  }
+
+  get viewPrimaryButtonIcon(): string {
+    if (!this.isViewFormOpen) {
+      return 'bi-plus-lg';
+    }
+    return this.viewForm.valid ? 'bi-check-lg' : 'bi-pencil';
+  }
+
+  get viewPrimaryButtonClasses(): string {
+    if (!this.isViewFormOpen) {
+      return 'btn btn-primary';
+    }
+    return this.viewForm.valid ? 'btn btn-success' : 'btn btn-outline-primary';
+  }
+
+  handleViewPrimaryAction(): void {
+    if (!this.isViewFormOpen) {
+      this.createView();
+      return;
+    }
+    this.saveView();
   }
 
   saveView(): void {
@@ -225,6 +261,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       filterJson: view.filterJson ? view.filterJson : '',
       groupingsJson: view.groupings ? JSON.stringify(view.groupings, null, 2) : ''
     });
+    this.isViewFormOpen = true;
   }
 
   private resetForm(): void {
@@ -232,6 +269,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     this.viewForm.reset({ name: '', isCommon: false, sortOrder: 0, filterJson: '', groupingsJson: '' });
     this.resultsSubject.next([]);
     this.aclResultsSubject.next([]);
+    this.isViewFormOpen = false;
   }
 
   private parseJson(value: string, expectArray = false): any[] | Record<string, unknown> | undefined | null {

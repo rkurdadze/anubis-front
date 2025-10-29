@@ -143,6 +143,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   isSavingBinding = false;
   deletingClassId: number | null = null;
   deletingBindingId: number | null = null;
+  isClassFormOpen = false;
 
   ngOnInit(): void {
     this.selectedClass$
@@ -174,12 +175,47 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   selectClass(cls: ObjectClass): void {
     this.selectedClassId$.next(cls.id);
     this.bindingsReload$.next();
+    this.isClassFormOpen = true;
   }
 
   startCreate(): void {
     this.selectedClassId$.next(null);
     this.classForm.reset({ name: '', objectTypeId: null, description: '', isActive: true });
     this.bindingForm.reset({ propertyDefId: null, isReadonly: false, isHidden: false, displayOrder: 0 });
+    this.isClassFormOpen = true;
+  }
+
+  get classPrimaryButtonLabel(): string {
+    if (!this.isClassFormOpen) {
+      return 'Новый класс';
+    }
+    return 'Сохранить класс';
+  }
+
+  get classPrimaryButtonIcon(): string {
+    if (!this.isClassFormOpen) {
+      return 'bi-plus-lg';
+    }
+    return this.classForm.valid ? 'bi-check-lg' : 'bi-pencil';
+  }
+
+  get classPrimaryButtonClasses(): string {
+    if (!this.isClassFormOpen) {
+      return 'btn btn-primary';
+    }
+    return this.classForm.valid ? 'btn btn-success' : 'btn btn-outline-primary';
+  }
+
+  handleClassPrimaryAction(): void {
+    if (!this.isClassFormOpen) {
+      this.startCreate();
+      return;
+    }
+    this.saveClass();
+  }
+
+  closeClassForm(): void {
+    this.isClassFormOpen = false;
   }
 
   saveClass(): void {

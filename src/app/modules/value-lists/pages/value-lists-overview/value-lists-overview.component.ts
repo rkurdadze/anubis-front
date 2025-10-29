@@ -30,6 +30,7 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
   private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
   private messageTimeoutHandle: number | null = null;
   private currentListId: number | null = null;
+  isListFormOpen = false;
 
   readonly filterForm = this.fb.group({
     search: [''],
@@ -139,12 +140,47 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
 
   selectList(list: ValueList): void {
     this.selectedListId$.next(list.id);
+    this.isListFormOpen = true;
   }
 
   startCreate(): void {
     this.selectedListId$.next(null);
     this.listForm.reset({ name: '', isActive: true, nameI18n: '' });
     this.itemForm.reset({ value: '', valueI18n: '', sortOrder: 0, parentItemId: null, externalCode: '', isActive: true });
+    this.isListFormOpen = true;
+  }
+
+  closeListForm(): void {
+    this.isListFormOpen = false;
+  }
+
+  get listPrimaryButtonLabel(): string {
+    if (!this.isListFormOpen) {
+      return 'Новый справочник';
+    }
+    return 'Сохранить справочник';
+  }
+
+  get listPrimaryButtonIcon(): string {
+    if (!this.isListFormOpen) {
+      return 'bi-plus-lg';
+    }
+    return this.listForm.valid ? 'bi-check-lg' : 'bi-pencil';
+  }
+
+  get listPrimaryButtonClasses(): string {
+    if (!this.isListFormOpen) {
+      return 'btn btn-primary';
+    }
+    return this.listForm.valid ? 'btn btn-success' : 'btn btn-outline-primary';
+  }
+
+  handleListPrimaryAction(): void {
+    if (!this.isListFormOpen) {
+      this.startCreate();
+      return;
+    }
+    this.saveList();
   }
 
   saveList(): void {

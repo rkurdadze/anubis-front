@@ -18,7 +18,7 @@
     {{ message.text }}
   </div>
 
-  <div class="row g-4">
+  <div class="row g-4 align-items-start">
     <div class="col-12 col-xl-5">
       <div class="card border-0 anubis-shadow h-100">
         <div class="card-header bg-white">
@@ -72,13 +72,14 @@
       </div>
     </div>
 
-    <div class="col-12 col-xl-7">
-      <div class="card border-0 anubis-shadow mb-4">
-        <div class="card-header bg-white">
-          <h2 class="h5 mb-0">{{ (selectedList$ | async)?.name ?? 'Новый справочник' }}</h2>
-        </div>
-        <div class="card-body">
-          <form [formGroup]="listForm" class="row g-3" (ngSubmit)="saveList()">
+    <div class="col-12 col-xl-7 mt-4 mt-xl-0">
+      <div class="d-flex flex-column gap-4">
+        <div class="card border-0 anubis-shadow">
+          <div class="card-header bg-white">
+            <h2 class="h5 mb-0">{{ (selectedList$ | async)?.name ?? 'Новый справочник' }}</h2>
+          </div>
+          <div class="card-body">
+            <form [formGroup]="listForm" class="row g-3" (ngSubmit)="saveList()">
             <div class="col-12">
               <label class="form-label">Название</label>
               <input type="text" class="form-control" formControlName="name" [class.is-invalid]="listForm.get('name')?.invalid && listForm.get('name')?.touched" />
@@ -104,92 +105,93 @@
             </div>
           </form>
         </div>
-      </div>
+        </div>
 
-      <div class="card border-0 anubis-shadow" *ngIf="(selectedList$ | async) as selected">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <div>
-            <h2 class="h6 mb-0">Элементы списка</h2>
-            <p class="text-muted small mb-0">Добавляйте значения и управляйте их порядком отображения</p>
+        <div class="card border-0 anubis-shadow" *ngIf="(selectedList$ | async) as selected">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+              <h2 class="h6 mb-0">Элементы списка</h2>
+              <p class="text-muted small mb-0">Добавляйте значения и управляйте их порядком отображения</p>
+            </div>
           </div>
-        </div>
-        <div class="card-body border-bottom">
-          <form [formGroup]="itemForm" class="row g-3" (ngSubmit)="createItem()">
-            <div class="col-12 col-md-6">
-              <label class="form-label">Значение</label>
-              <input type="text" class="form-control" formControlName="value" [class.is-invalid]="itemForm.get('value')?.invalid && itemForm.get('value')?.touched" />
-              <div class="invalid-feedback">Введите значение.</div>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Локализации (JSON)</label>
-              <input type="text" class="form-control" formControlName="valueI18n" placeholder='{"ru":"Значение"}' />
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label">Порядок</label>
-              <input type="number" class="form-control" formControlName="sortOrder" />
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label">Родительский элемент</label>
-              <input type="number" class="form-control" formControlName="parentItemId" placeholder="ID родителя" />
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label">Внешний код</label>
-              <input type="text" class="form-control" formControlName="externalCode" />
-            </div>
-            <div class="col-12">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="itemActive" formControlName="isActive" />
-                <label class="form-check-label" for="itemActive">Активное значение</label>
+          <div class="card-body border-bottom">
+            <form [formGroup]="itemForm" class="row g-3" (ngSubmit)="createItem()">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Значение</label>
+                <input type="text" class="form-control" formControlName="value" [class.is-invalid]="itemForm.get('value')?.invalid && itemForm.get('value')?.touched" />
+                <div class="invalid-feedback">Введите значение.</div>
               </div>
-            </div>
-            <div class="col-12">
-              <button type="submit" class="btn btn-outline-primary" [disabled]="isSavingItem">Добавить значение</button>
-            </div>
-          </form>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead class="table-light text-uppercase small text-muted">
-              <tr>
-                <th scope="col">Значение</th>
-                <th scope="col">Порядок</th>
-                <th scope="col">Статус</th>
-                <th scope="col" class="text-end">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of items$ | async; trackBy: trackByItemId">
-                <td>
-                  <div class="fw-semibold">{{ item.value }}</div>
-                  <div class="text-muted small">ID: {{ item.id }}</div>
-                </td>
-                <td>{{ item.sortOrder ?? '—' }}</td>
-                <td>
-                  <span class="badge" [ngClass]="item.isActive ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'">
-                    {{ item.isActive ? 'Активно' : 'Отключено' }}
-                  </span>
-                </td>
-                <td class="text-end">
-                  <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-secondary" type="button" (click)="deactivateItem(item)">
-                      <i class="bi bi-slash-circle"></i>
-                    </button>
-                    <button
-                      class="btn btn-outline-danger"
-                      type="button"
-                      [disabled]="deletingItemId === item.id"
-                      (click)="deleteItem(item)"
-                    >
-                      <i class="bi bi-trash"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr *ngIf="(items$ | async)?.length === 0">
-                <td colspan="4" class="text-center text-muted py-4">В списке пока нет значений.</td>
-              </tr>
-            </tbody>
-          </table>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Локализации (JSON)</label>
+                <input type="text" class="form-control" formControlName="valueI18n" placeholder='{"ru":"Значение"}' />
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">Порядок</label>
+                <input type="number" class="form-control" formControlName="sortOrder" />
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">Родительский элемент</label>
+                <input type="number" class="form-control" formControlName="parentItemId" placeholder="ID родителя" />
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">Внешний код</label>
+                <input type="text" class="form-control" formControlName="externalCode" />
+              </div>
+              <div class="col-12">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="itemActive" formControlName="isActive" />
+                  <label class="form-check-label" for="itemActive">Активное значение</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-outline-primary" [disabled]="isSavingItem">Добавить значение</button>
+              </div>
+            </form>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light text-uppercase small text-muted">
+                <tr>
+                  <th scope="col">Значение</th>
+                  <th scope="col">Порядок</th>
+                  <th scope="col">Статус</th>
+                  <th scope="col" class="text-end">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of items$ | async; trackBy: trackByItemId">
+                  <td>
+                    <div class="fw-semibold">{{ item.value }}</div>
+                    <div class="text-muted small">ID: {{ item.id }}</div>
+                  </td>
+                  <td>{{ item.sortOrder ?? '—' }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="item.isActive ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'">
+                      {{ item.isActive ? 'Активно' : 'Отключено' }}
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                      <button class="btn btn-outline-secondary" type="button" (click)="deactivateItem(item)">
+                        <i class="bi bi-slash-circle"></i>
+                      </button>
+                      <button
+                        class="btn btn-outline-danger"
+                        type="button"
+                        [disabled]="deletingItemId === item.id"
+                        (click)="deleteItem(item)"
+                      >
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr *ngIf="(items$ | async)?.length === 0">
+                  <td colspan="4" class="text-center text-muted py-4">В списке пока нет значений.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
