@@ -1,4 +1,4 @@
-@import 'bootstrap/scss/bootstrap';
+@use './styles/bootstrap-lite' as *;
 
 :root {
   --anubis-primary: #322d5c;

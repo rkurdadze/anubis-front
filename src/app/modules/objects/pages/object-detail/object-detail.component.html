@@ -1,0 +1,411 @@
+<section class="object-detail">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <a routerLink="/objects" class="btn btn-link px-0">
+      <i class="bi bi-arrow-left"></i>
+      <span class="ms-1">К списку объектов</span>
+    </a>
+    <button type="button" class="btn btn-outline-secondary" (click)="refreshAll()">
+      <i class="bi bi-arrow-repeat me-1"></i>
+      Обновить данные
+    </button>
+  </div>
+
+  <div *ngIf="message$ | async as message" class="alert" [ngClass]="{'alert-success': message.type === 'success', 'alert-danger': message.type === 'error', 'alert-info': message.type === 'info'}">
+    <div class="d-flex justify-content-between align-items-start">
+      <span>{{ message.text }}</span>
+      <button type="button" class="btn-close" aria-label="Закрыть" (click)="dismissMessage()"></button>
+    </div>
+  </div>
+
+  <ng-container *ngIf="object$ | async as object; else objectLoading">
+    <header class="page-header mb-4">
+      <h1 class="h3 mb-1">Объект #{{ object.id }} — {{ object.name }}</h1>
+      <p class="text-muted mb-0">
+        Тип: {{ getObjectTypeName(object.typeId) }} · Класс: {{ getClassName(object.classId ?? null) }}
+      </p>
+    </header>
+
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">Основная информация</h2>
+        <span class="badge" [ngClass]="object.isDeleted ? 'bg-secondary' : 'bg-success'">
+          {{ object.isDeleted ? 'Удалён' : 'Активен' }}
+        </span>
+      </div>
+      <div class="card-body">
+        <form [formGroup]="objectForm" (ngSubmit)="saveObject(object)" class="row g-3">
+          <div class="col-md-6">
+            <label for="object-name" class="form-label">Название</label>
+            <input
+              id="object-name"
+              type="text"
+              class="form-control"
+              formControlName="name"
+              [ngClass]="{'is-invalid': objectForm.get('name')?.invalid && (objectForm.get('name')?.dirty || objectForm.get('name')?.touched)}"
+              autocomplete="off"
+            />
+            <div class="invalid-feedback" *ngIf="objectForm.get('name')?.errors?.['required']">Укажите название объекта.</div>
+            <div class="invalid-feedback" *ngIf="objectForm.get('name')?.errors?.['maxlength']">Название не может превышать 255 символов.</div>
+          </div>
+          <div class="col-md-3">
+            <label for="object-type" class="form-label">Тип</label>
+            <select
+              id="object-type"
+              class="form-select"
+              formControlName="typeId"
+              [ngClass]="{'is-invalid': objectForm.get('typeId')?.invalid && (objectForm.get('typeId')?.dirty || objectForm.get('typeId')?.touched)}"
+            >
+              <option [ngValue]="null" disabled>Выберите тип</option>
+              <option *ngFor="let type of (objectTypes$ | async)" [ngValue]="type.id">{{ type.name }}</option>
+            </select>
+            <div class="invalid-feedback" *ngIf="objectForm.get('typeId')?.errors?.['required']">Необходимо выбрать тип объекта.</div>
+          </div>
+          <div class="col-md-3">
+            <label for="object-class" class="form-label">Класс</label>
+            <select id="object-class" class="form-select" formControlName="classId">
+              <option [ngValue]="null">Без класса</option>
+              <option *ngFor="let cls of (availableClasses$ | async)" [ngValue]="cls.id">{{ cls.name }}</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <small class="text-muted">
+              Создан: <strong *ngIf="object.createdAt; else noDate">{{ object.createdAt | date: 'dd.MM.yyyy HH:mm' }}</strong>
+              <ng-template #noDate><span class="text-muted">—</span></ng-template>
+              <span *ngIf="object.createdBy" class="ms-2">Автор: {{ object.createdBy }}</span>
+            </small>
+            <button type="submit" class="btn btn-primary" [disabled]="isSavingObject || objectForm.invalid">
+              <span *ngIf="isSavingObject" class="spinner-border spinner-border-sm me-1"></span>
+              Сохранить изменения
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <nav class="nav nav-tabs mb-4">
+      <button type="button" class="nav-link" [ngClass]="{active: activeTab === 'properties'}" (click)="setActiveTab('properties')">
+        Свойства
+      </button>
+      <button type="button" class="nav-link" [ngClass]="{active: activeTab === 'versions'}" (click)="setActiveTab('versions')">
+        Версии
+      </button>
+      <button type="button" class="nav-link" [ngClass]="{active: activeTab === 'files'}" (click)="setActiveTab('files')">
+        Файлы
+      </button>
+      <button type="button" class="nav-link" [ngClass]="{active: activeTab === 'links'}" (click)="setActiveTab('links')">
+        Связи
+      </button>
+    </nav>
+
+    <div [ngSwitch]="activeTab">
+      <section *ngSwitchCase="'properties'">
+        <ng-container *ngIf="selectedVersionWithAudit$ | async as versionInfo">
+          <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-3">
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+              <label class="form-label mb-0" for="version-select">Версия</label>
+              <select id="version-select" class="form-select" [value]="versionInfo.version?.id ?? ''" (change)="selectVersion($any($event.target).value ? +$any($event.target).value : null)">
+                <option value="" disabled>Выберите версию</option>
+                <option *ngFor="let version of (versions$ | async); trackBy: trackByVersionId" [value]="version.id">
+                  v{{ version.versionNum }} — {{ version.createdAt | date: 'dd.MM.yyyy HH:mm' }}
+                </option>
+              </select>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary" (click)="resetProperties()">Сбросить</button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="!versionInfo.version || isSavingProperties || propertiesForm.invalid"
+                (click)="saveProperties(versionInfo.version)"
+              >
+                <span *ngIf="isSavingProperties" class="spinner-border spinner-border-sm me-1"></span>
+                Сохранить свойства
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="!versionInfo.version" class="alert alert-info">
+            Для объекта отсутствуют версии. Создайте первую версию, чтобы добавить свойства.
+          </div>
+
+          <ng-container *ngIf="versionInfo.version">
+            <form [formGroup]="propertiesFormGroup" class="properties-form">
+              <div formArrayName="properties" class="d-flex flex-column gap-3">
+                <div *ngFor="let group of propertiesControls; index as i" [formGroupName]="i" class="card">
+                  <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-4">
+                        <label class="form-label">Свойство</label>
+                        <select class="form-select" formControlName="propertyDefId">
+                          <option [ngValue]="null" disabled>Выберите свойство</option>
+                          <option *ngFor="let def of (propertyDefinitions$ | async); trackBy: trackById" [ngValue]="def.id">{{ def.name }}</option>
+                        </select>
+                      </div>
+                      <div class="col-md-7">
+                        <label class="form-label">Значение</label>
+                        <ng-container *ngIf="getPropertyDefinition(group.get('propertyDefId')?.value ?? null) as definition; else genericInput">
+                          <ng-container [ngSwitch]="definition.dataType">
+                            <select *ngSwitchCase="'BOOLEAN'" class="form-select" formControlName="value">
+                              <option value="true">Истина</option>
+                              <option value="false">Ложь</option>
+                            </select>
+                            <input *ngSwitchCase="'DATE'" type="datetime-local" class="form-control" formControlName="value" />
+                            <textarea *ngSwitchCase="'MULTI_VALUELIST'" class="form-control" rows="2" formControlName="value" placeholder="Значения через запятую"></textarea>
+                            <input *ngSwitchDefault type="text" class="form-control" formControlName="value" />
+                          </ng-container>
+                        </ng-container>
+                        <ng-template #genericInput>
+                          <input type="text" class="form-control" formControlName="value" />
+                        </ng-template>
+                      </div>
+                      <div class="col-md-1 text-end">
+                        <button type="button" class="btn btn-outline-danger" (click)="removeProperty(i)">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-3">
+                <button type="button" class="btn btn-outline-primary" (click)="addProperty()">
+                  <i class="bi bi-plus-lg me-1"></i>
+                  Добавить свойство
+                </button>
+                <span class="text-muted small">Всего свойств: {{ propertiesControls.length }}</span>
+              </div>
+            </form>
+          </ng-container>
+        </ng-container>
+      </section>
+
+      <section *ngSwitchCase="'versions'">
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Версия</th>
+                    <th scope="col">Комментарий</th>
+                    <th scope="col">Создана</th>
+                    <th scope="col">Автор</th>
+                  </tr>
+                </thead>
+                <tbody *ngIf="versions$ | async as versions">
+                  <ng-container *ngIf="versions.length; else emptyVersions">
+                    <ng-container *ngIf="selectedVersionId$ | async as selectedVersionId">
+                      <tr
+                        *ngFor="let version of versions; trackBy: trackByVersionId"
+                        (click)="selectVersion(version.id)"
+                        [ngClass]="{'table-active': selectedVersionId === version.id}"
+                      >
+                        <td class="fw-semibold">v{{ version.versionNum }}</td>
+                        <td>{{ version.comment || '—' }}</td>
+                        <td>{{ version.createdAt | date: 'dd.MM.yyyy HH:mm' }}</td>
+                        <td>{{ version.createdByName || '—' }}</td>
+                      </tr>
+                    </ng-container>
+                  </ng-container>
+                  <ng-template #emptyVersions>
+                    <tr>
+                      <td colspan="4" class="text-center text-muted py-4">Версии не найдены.</td>
+                    </tr>
+                  </ng-template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-4" *ngIf="selectedVersionWithAudit$ | async as versionInfo">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="h6 mb-0">Журнал изменений версии</h3>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refreshAudit()">Обновить</button>
+          </div>
+          <div class="card-body">
+            <p class="text-muted" *ngIf="!versionInfo.version">Выберите версию, чтобы увидеть историю изменений.</p>
+            <ng-container *ngIf="versionInfo.version">
+              <h4 class="h6">Версия v{{ versionInfo.version.versionNum }}</h4>
+              <p class="text-muted">Создана {{ versionInfo.version.createdAt | date: 'dd.MM.yyyy HH:mm' }} пользователем {{ versionInfo.version.createdByName || '—' }}</p>
+              <div *ngIf="versionInfo.audit.length; else noAudit">
+                <ul class="list-group list-group-flush">
+                  <li *ngFor="let entry of versionInfo.audit; trackBy: trackById" class="list-group-item">
+                    <div class="d-flex justify-content-between">
+                      <span class="fw-semibold">{{ entry.changeType }}</span>
+                      <span class="text-muted">{{ entry.modifiedAt | date: 'dd.MM.yyyy HH:mm' }}</span>
+                    </div>
+                    <div class="text-muted small">{{ entry.changeSummary || 'Без описания' }}</div>
+                    <div *ngIf="entry.fieldChanged" class="small mt-1">
+                      Поле: {{ entry.fieldChanged }} · {{ entry.oldValue || '—' }} → {{ entry.newValue || '—' }}
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <ng-template #noAudit>
+                <p class="text-muted mb-0">Для выбранной версии нет записей аудита.</p>
+              </ng-template>
+            </ng-container>
+          </div>
+        </div>
+      </section>
+
+      <section *ngSwitchCase="'files'">
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="h6 mb-0">Файлы объекта</h3>
+                <label class="btn btn-outline-primary btn-sm mb-0">
+                  <input type="file" class="d-none" (change)="uploadFile(object, $event)" [disabled]="isUploadingFile" />
+                  <i class="bi bi-upload"></i>
+                  <span class="ms-1">Загрузить</span>
+                </label>
+              </div>
+              <div class="card-body">
+                <div *ngIf="(objectFiles$ | async) as files">
+                  <p *ngIf="!files.length" class="text-muted mb-0">Файлы не прикреплены.</p>
+                  <ul class="list-group" *ngIf="files.length">
+                    <li *ngFor="let file of files; trackBy: trackById" class="list-group-item d-flex justify-content-between align-items-center gap-3">
+                      <div>
+                        <div class="fw-semibold">{{ file.filename }}</div>
+                        <div class="text-muted small">Размер: {{ file.size | number }} Б</div>
+                      </div>
+                      <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" (click)="downloadFile(file)">
+                          <i class="bi bi-download"></i>
+                        </button>
+                        <label class="btn btn-outline-primary mb-0">
+                          <i class="bi bi-arrow-repeat"></i>
+                          <input type="file" class="d-none" (change)="replaceFile(file, $event)" [disabled]="isUploadingFile" />
+                        </label>
+                        <button type="button" class="btn btn-outline-danger" (click)="deleteFile(file)">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header">
+                <h3 class="h6 mb-0">Файлы выбранной версии</h3>
+              </div>
+              <div class="card-body">
+                <ng-container *ngIf="selectedVersionWithAudit$ | async as versionInfo">
+                  <p class="text-muted" *ngIf="!versionInfo.version">Выберите версию, чтобы увидеть файлы.</p>
+                  <div *ngIf="versionInfo.version">
+                    <div *ngIf="(versionFiles$ | async) as versionFiles">
+                      <p *ngIf="!versionFiles.length" class="text-muted mb-0">Для версии нет файлов.</p>
+                      <ul *ngIf="versionFiles.length" class="list-group">
+                        <li *ngFor="let file of versionFiles; trackBy: trackById" class="list-group-item d-flex justify-content-between align-items-center">
+                          <span>{{ file.filename }}</span>
+                          <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-secondary" (click)="downloadFile(file)">
+                              <i class="bi bi-download"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" (click)="deleteFile(file)">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </div>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </ng-container>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section *ngSwitchCase="'links'">
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header">
+                <h3 class="h6 mb-0">Существующие связи</h3>
+              </div>
+              <div class="card-body">
+                <div *ngIf="(links$ | async) as links">
+                  <p *ngIf="!links.length" class="text-muted mb-0">Связи не найдены.</p>
+                  <ul *ngIf="links.length" class="list-group list-group-flush">
+                    <li *ngFor="let link of links; trackBy: trackById" class="list-group-item d-flex justify-content-between align-items-center gap-3">
+                      <div>
+                        <div class="fw-semibold">{{ link.roleName || ('Роль #' + link.roleId) }}</div>
+                        <div class="text-muted small">Целевой объект: #{{ link.targetId }} · Тип: {{ link.direction }}</div>
+                      </div>
+                      <button type="button" class="btn btn-outline-danger btn-sm" (click)="deleteLink(link)" [disabled]="isLinkActionInProgress">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header">
+                <h3 class="h6 mb-0">Добавить связь</h3>
+              </div>
+              <div class="card-body">
+                <form [formGroup]="linkForm" (ngSubmit)="createLink(object)" class="row g-3">
+                  <div class="col-12">
+                    <label for="link-target" class="form-label">Идентификатор объекта</label>
+                    <input
+                      id="link-target"
+                      type="number"
+                      class="form-control"
+                      formControlName="targetId"
+                      [ngClass]="{'is-invalid': linkForm.get('targetId')?.invalid && (linkForm.get('targetId')?.dirty || linkForm.get('targetId')?.touched)}"
+                    />
+                    <div class="invalid-feedback">Укажите идентификатор целевого объекта.</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="link-role" class="form-label">Роль</label>
+                    <select
+                      id="link-role"
+                      class="form-select"
+                      formControlName="role"
+                      [ngClass]="{'is-invalid': linkForm.get('role')?.invalid && (linkForm.get('role')?.dirty || linkForm.get('role')?.touched)}"
+                    >
+                      <option value="" disabled>Выберите роль</option>
+                      <option *ngFor="let role of (linkRoles$ | async); trackBy: trackById" [value]="role.name">{{ role.name }}</option>
+                    </select>
+                    <div class="invalid-feedback">Необходимо выбрать роль связи.</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="link-direction" class="form-label">Направление</label>
+                    <select id="link-direction" class="form-select" formControlName="direction">
+                      <option *ngFor="let direction of linkDirections" [value]="direction">{{ direction }}</option>
+                    </select>
+                  </div>
+                  <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-primary" [disabled]="linkForm.invalid || isLinkActionInProgress">
+                      <span *ngIf="isLinkActionInProgress" class="spinner-border spinner-border-sm me-1"></span>
+                      Создать связь
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </ng-container>
+
+  <ng-template #objectLoading>
+    <div class="card">
+      <div class="card-body text-center py-5 text-muted">
+        <div class="spinner-border mb-3" role="status"></div>
+        <p class="mb-0">Загрузка данных объекта…</p>
+      </div>
+    </div>
+  </ng-template>
+</section>

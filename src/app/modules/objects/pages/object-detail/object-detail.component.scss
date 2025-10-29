@@ -1,0 +1,18 @@
+.object-detail {
+  .page-header {
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    padding-bottom: 0.5rem;
+  }
+
+  .properties-form {
+    .card {
+      border-color: var(--bs-border-color-translucent);
+    }
+  }
+
+  .nav-tabs {
+    .nav-link {
+      cursor: pointer;
+    }
+  }
+}

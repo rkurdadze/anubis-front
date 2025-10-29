@@ -1,0 +1,80 @@
+.objects-list {
+  .page-header {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(32, 201, 151, 0.08));
+    border-radius: 0.75rem;
+    padding: 1.5rem 1.75rem;
+
+    h1 {
+      font-weight: 600;
+    }
+  }
+
+  .card {
+    box-shadow: 0 0.5rem 1rem rgba(15, 23, 42, 0.05);
+    border: none;
+    border-radius: 0.75rem;
+  }
+
+  .card-header {
+    background-color: transparent;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .create-panel {
+    border: 1px solid rgba(13, 110, 253, 0.2);
+  }
+
+  .badge {
+    text-transform: uppercase;
+    font-size: 0.675rem;
+    letter-spacing: 0.05em;
+    padding: 0.35rem 0.75rem;
+  }
+
+  .table {
+    thead {
+      th {
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+        color: rgba(15, 23, 42, 0.6);
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      }
+    }
+
+    tbody {
+      tr {
+        transition: background-color 0.2s ease;
+
+        &.table-danger {
+          background-color: rgba(220, 53, 69, 0.08);
+        }
+
+        &:hover {
+          background-color: rgba(13, 110, 253, 0.05);
+        }
+      }
+    }
+  }
+
+  .btn-group .btn {
+    min-width: 2.25rem;
+  }
+
+  .invalid-feedback {
+    display: block;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .objects-list {
+    .page-header {
+      padding: 1.25rem;
+    }
+
+    .card {
+      border-radius: 0.5rem;
+    }
+  }
+}

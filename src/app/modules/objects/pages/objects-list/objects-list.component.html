@@ -1,0 +1,206 @@
+<section class="objects-list">
+  <header class="page-header d-flex flex-wrap gap-3 align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="h3 mb-1">Объекты хранилища</h1>
+      <p class="text-muted mb-0">Управляйте объектами, их типами и состояниями. Здесь доступны фильтры, быстрые действия и создание новых записей.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-outline-secondary" (click)="refresh()" [disabled]="isPerformingAction">
+        <i class="bi bi-arrow-repeat me-1"></i>
+        Обновить
+      </button>
+      <button type="button" class="btn btn-primary" (click)="toggleCreatePanel()">
+        <i class="bi" [ngClass]="isCreatePanelOpen ? 'bi-dash-lg' : 'bi-plus-lg'"></i>
+        <span class="ms-2">{{ isCreatePanelOpen ? 'Скрыть форму' : 'Новый объект' }}</span>
+      </button>
+    </div>
+  </header>
+
+  <div *ngIf="message$ | async as message" class="alert" [ngClass]="{'alert-success': message.type === 'success', 'alert-danger': message.type === 'error'}">
+    <div class="d-flex justify-content-between align-items-start">
+      <span>{{ message.text }}</span>
+      <button type="button" class="btn-close" aria-label="Закрыть" (click)="dismissMessage()"></button>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form class="row gy-3 gx-3 align-items-end" [formGroup]="filterForm">
+        <div class="col-md-4">
+          <label for="objects-search" class="form-label">Поиск</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input
+              id="objects-search"
+              type="search"
+              class="form-control"
+              placeholder="Название или идентификатор"
+              formControlName="search"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label for="objects-type" class="form-label">Тип объекта</label>
+          <select id="objects-type" class="form-select" formControlName="typeId">
+            <option [ngValue]="null">Все типы</option>
+            <option *ngFor="let type of (objectTypes$ | async)" [ngValue]="type.id">{{ type.name }}</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="objects-class" class="form-label">Класс</label>
+          <select id="objects-class" class="form-select" formControlName="classId">
+            <option [ngValue]="null">Все классы</option>
+            <option *ngFor="let cls of (availableClasses$ | async)" [ngValue]="cls.id">{{ cls.name }}</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <div class="form-check form-switch mt-md-4 pt-md-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="objects-deleted" formControlName="showDeleted" />
+            <label class="form-check-label" for="objects-deleted">Показывать удалённые</label>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div *ngIf="isCreatePanelOpen" class="card create-panel mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2 class="h5 mb-0">Создание объекта</h2>
+      <button type="button" class="btn-close" aria-label="Закрыть" (click)="toggleCreatePanel()"></button>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="createForm" (ngSubmit)="createObject()" class="row g-3">
+        <div class="col-md-6">
+          <label for="create-name" class="form-label">Название</label>
+          <input
+            id="create-name"
+            type="text"
+            class="form-control"
+            formControlName="name"
+            [ngClass]="{'is-invalid': createForm.get('name')?.invalid && (createForm.get('name')?.dirty || createForm.get('name')?.touched)}"
+            placeholder="Введите название"
+            autocomplete="off"
+          />
+          <div class="invalid-feedback" *ngIf="createForm.get('name')?.errors?.['required']">
+            Название обязательно для заполнения.
+          </div>
+          <div class="invalid-feedback" *ngIf="createForm.get('name')?.errors?.['maxlength']">
+            Название должно быть короче 255 символов.
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label for="create-type" class="form-label">Тип</label>
+          <select
+            id="create-type"
+            class="form-select"
+            formControlName="typeId"
+            [ngClass]="{'is-invalid': createForm.get('typeId')?.invalid && (createForm.get('typeId')?.dirty || createForm.get('typeId')?.touched)}"
+          >
+            <option [ngValue]="null" disabled>Выберите тип</option>
+            <option *ngFor="let type of (objectTypes$ | async)" [ngValue]="type.id">{{ type.name }}</option>
+          </select>
+          <div class="invalid-feedback" *ngIf="createForm.get('typeId')?.errors?.['required']">
+            Необходимо выбрать тип объекта.
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label for="create-class" class="form-label">Класс</label>
+          <select id="create-class" class="form-select" formControlName="classId">
+            <option [ngValue]="null">Без класса</option>
+            <option *ngFor="let cls of (createFormClasses$ | async)" [ngValue]="cls.id">{{ cls.name }}</option>
+          </select>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2 mt-3">
+          <button type="button" class="btn btn-outline-secondary" (click)="toggleCreatePanel()">Отмена</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isPerformingAction || createForm.invalid">
+            <i class="bi bi-check-lg me-1"></i>
+            Создать объект
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <ng-container *ngIf="filteredObjects$ | async as objects">
+        <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom">
+          <span class="text-muted">Найдено объектов: <strong>{{ objects.length }}</strong></span>
+          <span class="text-muted small">Сортировка по названию A→Я</span>
+        </div>
+
+        <ng-container *ngIf="objects.length; else emptyState">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">ID</th>
+                  <th scope="col">Название</th>
+                  <th scope="col" class="text-nowrap">Тип</th>
+                  <th scope="col" class="text-nowrap">Класс</th>
+                  <th scope="col" class="text-nowrap">Создан</th>
+                  <th scope="col" class="text-nowrap">Статус</th>
+                  <th scope="col" class="text-end">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  *ngFor="let object of objects; trackBy: trackByObjectId"
+                  class="position-relative"
+                  [ngClass]="{'table-danger': object.isDeleted}"
+                >
+                  <td class="text-muted fw-semibold">#{{ object.id }}</td>
+                  <td class="fw-semibold">
+                    <a class="stretched-link" [routerLink]="['/objects', object.id]">{{ object.name }}</a>
+                  </td>
+                  <td>{{ object.typeName }}</td>
+                  <td>{{ object.className }}</td>
+                  <td>
+                    <span *ngIf="object.createdAt; else noDate">
+                      {{ object.createdAt | date: 'dd.MM.yyyy HH:mm' }}
+                    </span>
+                    <ng-template #noDate><span class="text-muted">—</span></ng-template>
+                    <span *ngIf="object.createdBy" class="d-block text-muted small mt-1">Автор: {{ object.createdBy }}</span>
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="object.isDeleted ? 'bg-secondary' : 'bg-success'">
+                      {{ object.isDeleted ? 'Удалён' : 'Активен' }}
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    <div class="btn-group btn-group-sm" role="group">
+                      <button type="button" class="btn btn-outline-primary" (click)="cloneObject(object)" [disabled]="isPerformingAction">
+                        <i class="bi bi-files"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-warning"
+                        (click)="softDelete(object)"
+                        [disabled]="isPerformingAction || object.isDeleted"
+                        title="Мягкое удаление"
+                      >
+                        <i class="bi bi-archive"></i>
+                      </button>
+                      <button type="button" class="btn btn-outline-danger" (click)="hardDelete(object)" [disabled]="isPerformingAction">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+      </ng-container>
+    </div>
+  </div>
+
+  <ng-template #emptyState>
+    <div class="text-center py-5">
+      <i class="bi bi-inboxes display-5 text-muted"></i>
+      <p class="text-muted mt-3 mb-1">Объекты не найдены.</p>
+      <p class="text-muted">Попробуйте изменить фильтры или создать новый объект.</p>
+    </div>
+  </ng-template>
+</section>

@@ -11,6 +11,10 @@ export class ObjectVersionApi {
 
   constructor(private readonly http: ApiHttpService) {}
 
+  listByObject(objectId: number): Observable<ObjectVersion[]> {
+    return this.http.get<ObjectVersion[]>(`${this.baseUrl}/object/${objectId}`);
+  }
+
   create(payload: Partial<ObjectVersion>): Observable<ObjectVersion> {
     return this.http.post<ObjectVersion>(this.baseUrl, payload);
   }
