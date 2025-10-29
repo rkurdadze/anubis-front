@@ -9,7 +9,7 @@
         class="nav-link d-flex align-items-center gap-2 px-4 py-3 text-white text-opacity-75"
         [routerLink]="item.route"
         routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: item.route === '/' }"
+        [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
       >
         <i class="bi" [ngClass]="item.icon"></i>
         <span>{{ item.label }}</span>

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import {NgClass, NgFor} from '@angular/common';
+import { NgClass, NgFor } from '@angular/common';
 
 interface NavItem {
   label: string;
@@ -18,7 +18,7 @@ interface NavItem {
 })
 export class NavigationComponent {
   readonly items: NavItem[] = [
-    { label: 'Панель управления', icon: 'bi-grid', route: '/' },
+    { label: 'Панель управления', icon: 'bi-grid', route: '/dashboard' },
     { label: 'Объекты', icon: 'bi-collection', route: '/objects' },
     { label: 'Типы объектов', icon: 'bi-diagram-3', route: '/object-types' },
     { label: 'Классы', icon: 'bi-layers', route: '/classes' },
