@@ -1,0 +1,22 @@
+.container-fluid {
+  max-width: 1280px;
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+.badge {
+  font-weight: 500;
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

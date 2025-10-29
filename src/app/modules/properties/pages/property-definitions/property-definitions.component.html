@@ -1,0 +1,163 @@
+<div class="container-fluid py-4">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Свойства и метаданные</h1>
+      <p class="text-muted mb-0">Определяйте свойства, их типы данных и связи со справочниками</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
+        <i class="bi bi-arrow-repeat me-1"></i>Обновить
+      </button>
+      <button class="btn btn-primary" type="button" (click)="startCreate()">
+        <i class="bi bi-plus-lg me-1"></i>Новое свойство
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="message$ | async as message" class="alert" [ngClass]="message.type === 'success' ? 'alert-success' : 'alert-danger'">
+    {{ message.text }}
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-6">
+      <div class="card border-0 anubis-shadow h-100">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">Справочник свойств</h2>
+        </div>
+        <div class="card-body border-bottom">
+          <form [formGroup]="filterForm" class="row g-3" (ngSubmit)="$event.preventDefault()">
+            <div class="col-12">
+              <label class="form-label">Поиск</label>
+              <input type="search" class="form-control" formControlName="search" placeholder="Название или идентификатор" />
+            </div>
+            <div class="col-12">
+              <label class="form-label">Тип данных</label>
+              <select class="form-select" formControlName="dataType">
+                <option value="">Все типы</option>
+                <option *ngFor="let type of dataTypes" [value]="type">{{ type }}</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light text-uppercase small text-muted">
+              <tr>
+                <th scope="col">Название</th>
+                <th scope="col">Тип</th>
+                <th scope="col">Привязки</th>
+                <th scope="col" class="text-end">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let property of filteredProperties$ | async; trackBy: trackByPropertyId">
+                <td>
+                  <button class="btn btn-link p-0 fw-semibold" type="button" (click)="startEdit(property)">
+                    {{ property.name }}
+                  </button>
+                  <div class="text-muted small">ID: {{ property.id }}</div>
+                </td>
+                <td>
+                  <span class="badge bg-primary-subtle text-primary">{{ property.dataType }}</span>
+                </td>
+                <td>
+                  <ng-container *ngIf="property.valueListId; else noValueList">
+                    <span class="badge bg-info-subtle text-info">Справочник #{{ property.valueListId }}</span>
+                  </ng-container>
+                  <ng-template #noValueList>
+                    <span class="text-muted small">Без связей</span>
+                  </ng-template>
+                </td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" type="button" (click)="startEdit(property)">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-outline-warning" type="button" (click)="deactivateProperty(property)" [disabled]="isDeactivatingId === property.id">
+                      <i class="bi bi-slash-circle"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" type="button" (click)="deleteProperty(property)" [disabled]="isDeletingId === property.id">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="(filteredProperties$ | async)?.length === 0">
+                <td colspan="4" class="text-center text-muted py-4">Свойства не найдены.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="card border-0 anubis-shadow">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">{{ editingProperty ? 'Редактирование свойства' : 'Новое свойство' }}</h2>
+        </div>
+        <div class="card-body">
+          <form [formGroup]="propertyForm" class="row g-3" (ngSubmit)="saveProperty()">
+            <div class="col-12">
+              <label class="form-label">Название</label>
+              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="propertyForm.get('name')?.invalid && propertyForm.get('name')?.touched" />
+              <div class="invalid-feedback">Укажите название свойства.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Тип данных</label>
+              <select class="form-select" formControlName="dataType">
+                <option *ngFor="let type of dataTypes" [ngValue]="type">{{ type }}</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Справочник</label>
+              <select class="form-select" formControlName="valueListId" [disabled]="propertyForm.get('dataType')?.value !== 'VALUELIST' && propertyForm.get('dataType')?.value !== 'MULTI_VALUELIST'">
+                <option [ngValue]="null">Не выбрано</option>
+                <option *ngFor="let list of valueLists$ | async" [ngValue]="list.id">{{ list.name }}</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Связанный тип объекта</label>
+              <select class="form-select" formControlName="refObjectTypeId">
+                <option [ngValue]="null">Не указан</option>
+                <option *ngFor="let type of objectTypes$ | async" [ngValue]="type.id">{{ type.name }}</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Регулярное выражение</label>
+              <input type="text" class="form-control" formControlName="regex" placeholder="Опционально" />
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Значение по умолчанию</label>
+              <input type="text" class="form-control" formControlName="defaultValue" />
+            </div>
+            <div class="col-12 col-md-6 d-flex align-items-center">
+              <div class="form-check me-3">
+                <input class="form-check-input" type="checkbox" id="required" formControlName="isRequired" />
+                <label class="form-check-label" for="required">Обязательное</label>
+              </div>
+              <div class="form-check me-3">
+                <input class="form-check-input" type="checkbox" id="unique" formControlName="isUnique" />
+                <label class="form-check-label" for="unique">Уникальное</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="multiselect" formControlName="isMultiselect" [disabled]="propertyForm.get('dataType')?.value === 'MULTI_VALUELIST'" />
+                <label class="form-check-label" for="multiselect">Множественный выбор</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Описание</label>
+              <textarea class="form-control" rows="3" formControlName="description"></textarea>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
+                {{ editingProperty ? 'Сохранить изменения' : 'Создать свойство' }}
+              </button>
+              <button type="button" class="btn btn-outline-secondary flex-fill" (click)="startCreate()">Очистить</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

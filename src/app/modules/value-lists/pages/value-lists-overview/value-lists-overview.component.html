@@ -1,0 +1,197 @@
+<div class="container-fluid py-4">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Справочники значений</h1>
+      <p class="text-muted mb-0">Структурируйте значения для свойств и управляйте иерархиями списков</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
+        <i class="bi bi-arrow-repeat me-1"></i>Обновить
+      </button>
+      <button class="btn btn-primary" type="button" (click)="startCreate()">
+        <i class="bi bi-plus-lg me-1"></i>Новый справочник
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="message$ | async as message" class="alert" [ngClass]="message.type === 'success' ? 'alert-success' : 'alert-danger'">
+    {{ message.text }}
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-5">
+      <div class="card border-0 anubis-shadow h-100">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">Список справочников</h2>
+        </div>
+        <div class="card-body border-bottom">
+          <form [formGroup]="filterForm" class="row g-3" (ngSubmit)="$event.preventDefault()">
+            <div class="col-12">
+              <label class="form-label">Поиск</label>
+              <input type="search" class="form-control" formControlName="search" placeholder="Название или идентификатор" />
+            </div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="showInactiveLists" formControlName="showInactive" />
+                <label class="form-check-label" for="showInactiveLists">Показывать деактивированные списки</label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="list-group list-group-flush">
+          <button
+            type="button"
+            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+            *ngFor="let list of filteredValueLists$ | async; trackBy: trackByListId"
+            [ngClass]="{ active: (selectedList$ | async)?.id === list.id }"
+            (click)="selectList(list)"
+          >
+            <div>
+              <div class="fw-semibold">{{ list.name }}</div>
+              <div class="text-muted small">ID: {{ list.id }}</div>
+            </div>
+            <span class="badge" [ngClass]="list.isActive ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'">
+              {{ list.isActive ? 'Активен' : 'Выключен' }}
+            </span>
+          </button>
+          <div *ngIf="(filteredValueLists$ | async)?.length === 0" class="px-3 py-4 text-center text-muted small">
+            Справочники не найдены.
+          </div>
+        </div>
+        <div class="card-footer bg-white text-end">
+          <button
+            type="button"
+            class="btn btn-outline-danger btn-sm"
+            *ngIf="(selectedList$ | async) as selected"
+            (click)="deleteList(selected)"
+            [disabled]="deletingListId === selected.id"
+          >
+            <i class="bi bi-trash"></i> Удалить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-7">
+      <div class="card border-0 anubis-shadow mb-4">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">{{ (selectedList$ | async)?.name ?? 'Новый справочник' }}</h2>
+        </div>
+        <div class="card-body">
+          <form [formGroup]="listForm" class="row g-3" (ngSubmit)="saveList()">
+            <div class="col-12">
+              <label class="form-label">Название</label>
+              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="listForm.get('name')?.invalid && listForm.get('name')?.touched" />
+              <div class="invalid-feedback">Укажите название справочника.</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" id="listActive" formControlName="isActive" />
+                <label class="form-check-label" for="listActive">
+                  {{ listForm.get('isActive')?.value ? 'Активен' : 'Выключен' }}
+                </label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Локализации (JSON)</label>
+              <textarea class="form-control" rows="3" formControlName="nameI18n" placeholder='{"ru":"Название"}'></textarea>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSavingList">
+                {{ (selectedList$ | async) ? 'Сохранить изменения' : 'Создать справочник' }}
+              </button>
+              <button type="button" class="btn btn-outline-secondary flex-fill" (click)="startCreate()">Очистить</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card border-0 anubis-shadow" *ngIf="(selectedList$ | async) as selected">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <div>
+            <h2 class="h6 mb-0">Элементы списка</h2>
+            <p class="text-muted small mb-0">Добавляйте значения и управляйте их порядком отображения</p>
+          </div>
+        </div>
+        <div class="card-body border-bottom">
+          <form [formGroup]="itemForm" class="row g-3" (ngSubmit)="createItem()">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Значение</label>
+              <input type="text" class="form-control" formControlName="value" [class.is-invalid]="itemForm.get('value')?.invalid && itemForm.get('value')?.touched" />
+              <div class="invalid-feedback">Введите значение.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Локализации (JSON)</label>
+              <input type="text" class="form-control" formControlName="valueI18n" placeholder='{"ru":"Значение"}' />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Порядок</label>
+              <input type="number" class="form-control" formControlName="sortOrder" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Родительский элемент</label>
+              <input type="number" class="form-control" formControlName="parentItemId" placeholder="ID родителя" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Внешний код</label>
+              <input type="text" class="form-control" formControlName="externalCode" />
+            </div>
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="itemActive" formControlName="isActive" />
+                <label class="form-check-label" for="itemActive">Активное значение</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-outline-primary" [disabled]="isSavingItem">Добавить значение</button>
+            </div>
+          </form>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light text-uppercase small text-muted">
+              <tr>
+                <th scope="col">Значение</th>
+                <th scope="col">Порядок</th>
+                <th scope="col">Статус</th>
+                <th scope="col" class="text-end">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of items$ | async; trackBy: trackByItemId">
+                <td>
+                  <div class="fw-semibold">{{ item.value }}</div>
+                  <div class="text-muted small">ID: {{ item.id }}</div>
+                </td>
+                <td>{{ item.sortOrder ?? '—' }}</td>
+                <td>
+                  <span class="badge" [ngClass]="item.isActive ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'">
+                    {{ item.isActive ? 'Активно' : 'Отключено' }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" type="button" (click)="deactivateItem(item)">
+                      <i class="bi bi-slash-circle"></i>
+                    </button>
+                    <button
+                      class="btn btn-outline-danger"
+                      type="button"
+                      [disabled]="deletingItemId === item.id"
+                      (click)="deleteItem(item)"
+                    >
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="(items$ | async)?.length === 0">
+                <td colspan="4" class="text-center text-muted py-4">В списке пока нет значений.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

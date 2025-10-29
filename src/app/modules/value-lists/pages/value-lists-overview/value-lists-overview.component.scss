@@ -1,0 +1,28 @@
+.container-fluid {
+  max-width: 1320px;
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+.list-group-item.active {
+  background-color: rgba(13, 110, 253, 0.1);
+  color: inherit;
+  border-color: rgba(13, 110, 253, 0.2);
+}
+
+.list-group-item.active .badge {
+  background-color: var(--bs-primary);
+  color: #fff;
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.badge {
+  font-weight: 500;
+}

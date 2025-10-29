@@ -1,0 +1,22 @@
+.container-fluid {
+  max-width: 1320px;
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+.list-group-item.active {
+  background-color: rgba(13, 110, 253, 0.1);
+  border-color: rgba(13, 110, 253, 0.2);
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.table {
+  font-size: 0.9rem;
+}

@@ -1,0 +1,223 @@
+<div class="container-fluid py-4">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Классы объектов</h1>
+      <p class="text-muted mb-0">Настройка бизнес-классов и связанных с ними свойств</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
+        <i class="bi bi-arrow-repeat me-1"></i>Обновить список
+      </button>
+      <button class="btn btn-primary" type="button" (click)="startCreate()">
+        <i class="bi bi-plus-lg me-1"></i>Новый класс
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="message$ | async as message" class="alert" [ngClass]="message.type === 'success' ? 'alert-success' : 'alert-danger'">
+    {{ message.text }}
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-5">
+      <div class="card border-0 anubis-shadow h-100">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">Список классов</h2>
+        </div>
+        <div class="card-body border-bottom">
+          <form [formGroup]="filterForm" class="row g-3" (ngSubmit)="$event.preventDefault()">
+            <div class="col-12">
+              <label class="form-label">Поиск</label>
+              <input type="search" class="form-control" formControlName="search" placeholder="Название, ID или тип" />
+            </div>
+            <div class="col-12">
+              <label class="form-label">Тип объекта</label>
+              <select class="form-select" formControlName="objectTypeId">
+                <option [ngValue]="null">Все типы</option>
+                <option *ngFor="let type of objectTypes$ | async" [ngValue]="type.id">{{ type.name }}</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="showInactive" formControlName="showInactive" />
+                <label class="form-check-label" for="showInactive">Показывать деактивированные классы</label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light text-uppercase small text-muted">
+              <tr>
+                <th scope="col">Название</th>
+                <th scope="col">Тип</th>
+                <th scope="col" class="text-end">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let cls of filteredClasses$ | async; trackBy: trackByClassId"
+                [ngClass]="{ 'table-active': (selectedClass$ | async)?.id === cls.id }"
+              >
+                <td>
+                  <button class="btn btn-link p-0 fw-semibold" type="button" (click)="selectClass(cls)">
+                    {{ cls.name }}
+                  </button>
+                  <div class="text-muted small">ID: {{ cls.id }}</div>
+                </td>
+                <td>#{{ cls.objectTypeId }}</td>
+                <td class="text-end">
+                  <button class="btn btn-outline-danger btn-sm" type="button" (click)="deleteClass(cls)" [disabled]="deletingClassId === cls.id">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="(filteredClasses$ | async)?.length === 0">
+                <td colspan="3" class="text-center text-muted py-4">Классы не найдены.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-7">
+      <div class="card border-0 anubis-shadow mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <div>
+            <h2 class="h5 mb-0">{{ (selectedClass$ | async)?.name ?? 'Новый класс' }}</h2>
+            <p class="text-muted small mb-0">
+              {{ (selectedClass$ | async) ? 'Редактирование выбранного класса' : 'Создание нового бизнес-класса' }}
+            </p>
+          </div>
+          <span *ngIf="(selectedClass$ | async)?.isActive === false" class="badge bg-secondary-subtle text-secondary">Деактивирован</span>
+        </div>
+        <div class="card-body">
+          <form [formGroup]="classForm" class="row g-3" (ngSubmit)="saveClass()">
+            <div class="col-12">
+              <label class="form-label">Название</label>
+              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="classForm.get('name')?.invalid && classForm.get('name')?.touched" />
+              <div class="invalid-feedback">Введите название класса.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Тип объекта</label>
+              <select class="form-select" formControlName="objectTypeId" [class.is-invalid]="classForm.get('objectTypeId')?.invalid && classForm.get('objectTypeId')?.touched">
+                <option [ngValue]="null" disabled>Выберите тип объекта</option>
+                <option *ngFor="let type of objectTypes$ | async" [ngValue]="type.id">{{ type.name }}</option>
+              </select>
+              <div class="invalid-feedback">Укажите тип объекта.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Статус</label>
+              <div class="form-switch">
+                <input class="form-check-input" type="checkbox" id="classActive" formControlName="isActive" />
+                <label class="form-check-label" for="classActive">
+                  {{ classForm.get('isActive')?.value ? 'Активен' : 'Деактивирован' }}
+                </label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Описание</label>
+              <textarea class="form-control" rows="3" formControlName="description" placeholder="Назначение класса"></textarea>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSavingClass">
+                {{ (selectedClass$ | async) ? 'Сохранить изменения' : 'Создать класс' }}
+              </button>
+              <button type="button" class="btn btn-outline-secondary flex-fill" (click)="startCreate()">Сбросить</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card border-0 anubis-shadow" *ngIf="(selectedClass$ | async) as current">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <div>
+            <h2 class="h6 mb-0">Привязанные свойства</h2>
+            <p class="text-muted small mb-0">Определяют метаданные доступные для объектов класса</p>
+          </div>
+        </div>
+        <div class="card-body border-bottom">
+          <form [formGroup]="bindingForm" class="row g-3" (ngSubmit)="createBinding()">
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Свойство</label>
+              <select class="form-select" formControlName="propertyDefId">
+                <option [ngValue]="null" disabled>Выберите свойство</option>
+                <option *ngFor="let prop of properties$ | async" [ngValue]="prop.id">{{ prop.name }}</option>
+              </select>
+            </div>
+            <div class="col-12 col-lg-2">
+              <label class="form-label">Порядок</label>
+              <input type="number" class="form-control" formControlName="displayOrder" />
+            </div>
+            <div class="col-6 col-lg-2 d-flex align-items-center">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="bindingReadonly" formControlName="isReadonly" />
+                <label class="form-check-label" for="bindingReadonly">Только чтение</label>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2 d-flex align-items-center">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="bindingHidden" formControlName="isHidden" />
+                <label class="form-check-label" for="bindingHidden">Скрыть</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-outline-primary" [disabled]="isSavingBinding">Добавить свойство</button>
+            </div>
+          </form>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light text-uppercase small text-muted">
+              <tr>
+                <th scope="col">Свойство</th>
+                <th scope="col">Порядок</th>
+                <th scope="col">Флаги</th>
+                <th scope="col" class="text-end">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let binding of bindings$ | async; trackBy: trackByBindingId">
+                <td>
+                  <div class="fw-semibold">#{{ binding.propertyDefId }}</div>
+                  <div class="text-muted small">ID привязки: {{ binding.id }}</div>
+                </td>
+                <td>{{ binding.displayOrder ?? '—' }}</td>
+                <td>
+                  <span class="badge rounded-pill" [ngClass]="binding.isReadonly ? 'bg-warning-subtle text-warning' : 'bg-light text-muted'">
+                    {{ binding.isReadonly ? 'Только чтение' : 'Редактируемое' }}
+                  </span>
+                  <span class="badge rounded-pill ms-1" [ngClass]="binding.isHidden ? 'bg-secondary-subtle text-secondary' : 'bg-light text-muted'">
+                    {{ binding.isHidden ? 'Скрыто' : 'Видимо' }}
+                  </span>
+                  <span class="badge rounded-pill ms-1" [ngClass]="binding.isActive ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'">
+                    {{ binding.isActive ? 'Активно' : 'Выключено' }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" type="button" (click)="deactivateBinding(binding)">
+                      <i class="bi bi-slash-circle"></i>
+                    </button>
+                    <button
+                      class="btn btn-outline-danger"
+                      type="button"
+                      [disabled]="deletingBindingId === binding.id"
+                      (click)="deleteBinding(binding)"
+                    >
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="(bindings$ | async)?.length === 0">
+                <td colspan="4" class="text-center text-muted py-4">Для класса ещё не добавлены свойства.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
