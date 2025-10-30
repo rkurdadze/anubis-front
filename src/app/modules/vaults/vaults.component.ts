@@ -2,11 +2,14 @@ import { AsyncPipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { BehaviorSubject, Observable, combineLatest, of } from 'rxjs';
 import { catchError, finalize, map, startWith } from 'rxjs/operators';
 
 import { VaultApi } from '../../core/api/vault.api';
-import { FileStorage, Vault } from '../../core/models/vault.model';
+import { FileStorageApi } from '../../core/api/file-storage.api';
+import { FileStorage } from '../../core/models/file-storage.model';
+import { SaveVaultPayload, Vault } from '../../core/models/vault.model';
 import { UiMessage, UiMessageService } from '../../shared/services/ui-message.service';
 import { StorageKind } from '../../core/models/storage-kind.enum';
 
@@ -27,7 +30,7 @@ interface VaultFormValue {
 @Component({
   selector: 'app-vaults',
   standalone: true,
-  imports: [ReactiveFormsModule, NgIf, NgFor, AsyncPipe, NgClass],
+  imports: [ReactiveFormsModule, NgIf, NgFor, AsyncPipe, NgClass, RouterLink],
   templateUrl: './vaults.component.html',
   styleUrls: ['./vaults.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -35,9 +38,11 @@ interface VaultFormValue {
 export class VaultsComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly vaultApi = inject(VaultApi);
+  private readonly fileStorageApi = inject(FileStorageApi);
   private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
 
   private readonly vaultsSubject = new BehaviorSubject<Vault[]>([]);
+  private readonly storagesSubject = new BehaviorSubject<FileStorage[]>([]);
   private readonly selectedVaultIdSubject = new BehaviorSubject<number | null>(null);
 
   isInitialized = false;
@@ -58,6 +63,7 @@ export class VaultsComponent implements OnDestroy {
   readonly message$ = this.uiMessages.message$;
 
   readonly vaults$ = this.vaultsSubject.asObservable();
+  readonly storages$ = this.storagesSubject.asObservable();
 
   readonly metrics$: Observable<VaultMetrics> = this.vaults$.pipe(
     map(vaults => ({
@@ -106,6 +112,7 @@ export class VaultsComponent implements OnDestroy {
   };
 
   isLoadingList = false;
+  isLoadingStorages = false;
   isSaving = false;
   deletingVaultId: number | null = null;
   togglingStatusId: number | null = null;
@@ -136,6 +143,7 @@ export class VaultsComponent implements OnDestroy {
       });
 
     this.loadVaults();
+    this.loadStorages();
   }
 
   ngOnDestroy(): void {
@@ -149,7 +157,7 @@ export class VaultsComponent implements OnDestroy {
   loadVaults(): void {
     this.isLoadingList = true;
     this.vaultApi
-      .getActive()
+      .list()
       .pipe(
         catchError(() => {
           this.showMessage('error', 'Не удалось загрузить список хранилищ.');
@@ -162,15 +170,37 @@ export class VaultsComponent implements OnDestroy {
       )
       .subscribe(vaults => {
         this.vaultsSubject.next(vaults);
-        if (vaults.length === 0) {
-          this.isFormVisible = false;
+        const selectedId = this.selectedVaultIdSubject.getValue();
+        if (!selectedId || !vaults.some(vault => vault.id === selectedId)) {
           this.selectedVaultIdSubject.next(null);
+          if (!vaults.length) {
+            this.isFormVisible = false;
+          }
         }
+      });
+  }
+
+  loadStorages(): void {
+    this.isLoadingStorages = true;
+    this.fileStorageApi
+      .list()
+      .pipe(
+        catchError(() => {
+          this.showMessage('error', 'Не удалось загрузить конфигурации файловых хранилищ.');
+          return of<FileStorage[]>([]);
+        }),
+        finalize(() => {
+          this.isLoadingStorages = false;
+        })
+      )
+      .subscribe(storages => {
+        this.storagesSubject.next(storages);
       });
   }
 
   refresh(): void {
     this.loadVaults();
+    this.loadStorages();
   }
 
   startCreate(): void {
@@ -249,12 +279,12 @@ export class VaultsComponent implements OnDestroy {
       return;
     }
 
-    const payload: Partial<Vault> = {
+    const payload: SaveVaultPayload = {
       name: vault.name,
       code: vault.code,
-      description: vault.description,
+      description: vault.description ?? undefined,
       isActive: !vault.isActive,
-      defaultStorage: vault.defaultStorage ?? null
+      defaultStorageId: vault.defaultStorage?.id ?? null
     };
 
     this.togglingStatusId = vault.id;
@@ -323,26 +353,60 @@ export class VaultsComponent implements OnDestroy {
     return this.storageKindLabels[kind] ?? kind;
   }
 
+  trackByStorageId(_: number, storage: FileStorage): number {
+    return storage.id;
+  }
+
+  storageOptionLabel(storage: FileStorage): string {
+    return `${this.storageDisplayName(storage)} • ${this.storageKindLabel(storage.kind)}`;
+  }
+
+  storageDisplayName(storage: FileStorage): string {
+    const name = storage.name?.trim();
+    if (name && name.length) {
+      return name;
+    }
+    return `Хранилище #${storage.id}`;
+  }
+
+  storageLocation(storage: FileStorage | null | undefined): string {
+    if (!storage) {
+      return '';
+    }
+
+    if (storage.kind === StorageKind.FS && storage.basePath) {
+      return storage.basePath;
+    }
+
+    if (storage.kind === StorageKind.S3) {
+      const parts = [storage.bucket, storage.endpoint].filter(Boolean) as string[];
+      return parts.join(' • ');
+    }
+
+    if (storage.kind === StorageKind.DB) {
+      return 'Хранение в базе данных';
+    }
+
+    return '';
+  }
+
   isSelected(vault: Vault): boolean {
     return this.selectedVaultIdSubject.getValue() === vault.id;
   }
 
-  private buildPayload(value: VaultFormValue): Partial<Vault> {
-    const description = value.description.trim();
-    const parsedId = value.defaultStorageId;
-    const defaultStorageId = parsedId !== null && parsedId !== undefined ? Number(parsedId) : null;
+  private buildPayload(value: VaultFormValue): SaveVaultPayload {
+    const description = value.description?.trim() ?? '';
+    const defaultStorageId = value.defaultStorageId;
 
-    let defaultStorage: FileStorage | null = null;
-    if (defaultStorageId && Number.isFinite(defaultStorageId)) {
-      defaultStorage = { id: defaultStorageId } as FileStorage;
-    }
+    const normalizedId =
+      typeof defaultStorageId === 'number' && Number.isFinite(defaultStorageId) ? defaultStorageId : null;
 
     return {
       name: value.name.trim(),
       code: value.code.trim(),
       description: description.length ? description : undefined,
       isActive: value.isActive,
-      defaultStorage
+      defaultStorageId: normalizedId
     };
   }
 

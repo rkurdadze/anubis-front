@@ -1,18 +1,4 @@
-import { StorageKind } from './storage-kind.enum';
-
-export interface FileStorage {
-  id: number;
-  kind: StorageKind;
-  name?: string;
-  description?: string;
-  basePath?: string;
-  bucket?: string;
-  endpoint?: string;
-  accessKey?: string;
-  secretKey?: string;
-  isDefault: boolean;
-  isActive: boolean;
-}
+import { FileStorage } from './file-storage.model';
 
 export interface Vault {
   id: number;
@@ -21,4 +7,12 @@ export interface Vault {
   description?: string;
   isActive: boolean;
   defaultStorage?: FileStorage | null;
+}
+
+export interface SaveVaultPayload {
+  code: string;
+  name: string;
+  description?: string;
+  defaultStorageId: number | null;
+  isActive: boolean;
 }

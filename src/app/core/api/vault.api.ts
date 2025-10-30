@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ApiHttpService } from '../services/api-http.service';
-import { Vault } from '../models/vault.model';
+import { SaveVaultPayload, Vault } from '../models/vault.model';
 
 @Injectable({ providedIn: 'root' })
 export class VaultApi {
@@ -10,24 +10,20 @@ export class VaultApi {
 
   constructor(private readonly http: ApiHttpService) {}
 
-  getActive(): Observable<Vault[]> {
-    return this.http.get<Vault[]>(`${this.baseUrl}/active`);
+  list(): Observable<Vault[]> {
+    return this.http.get<Vault[]>(this.baseUrl);
   }
 
-  getById(id: number): Observable<Vault> {
+  get(id: number): Observable<Vault> {
     return this.http.get<Vault>(`${this.baseUrl}/${id}`);
   }
 
-  getByCode(code: string): Observable<Vault> {
-    return this.http.get<Vault>(`${this.baseUrl}/code/${code}`);
+  create(payload: SaveVaultPayload): Observable<Vault> {
+    return this.http.post<Vault>(this.baseUrl, payload);
   }
 
-  create(vault: Partial<Vault>): Observable<Vault> {
-    return this.http.post<Vault>(this.baseUrl, vault);
-  }
-
-  update(id: number, vault: Partial<Vault>): Observable<Vault> {
-    return this.http.put<Vault>(`${this.baseUrl}/${id}`, vault);
+  update(id: number, payload: SaveVaultPayload): Observable<Vault> {
+    return this.http.put<Vault>(`${this.baseUrl}/${id}`, payload);
   }
 
   delete(id: number): Observable<void> {

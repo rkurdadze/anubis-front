@@ -1,0 +1,235 @@
+<section class="container-fluid py-4 file-storages-page">
+  <header class="page-header">
+    <div class="page-header__title">
+      <h1 class="h3 mb-1">Файловые хранилища</h1>
+      <p class="text-muted mb-0">Создавайте конфигурации физических хранилищ для данных (DB / FS / S3).</p>
+    </div>
+    <div class="page-header__actions">
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refresh()">
+        <i class="fa-solid fa-rotate-right me-1"></i>Обновить
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="startCreate()">
+        <i class="fa-solid fa-plus me-1"></i>Новое хранилище
+      </button>
+    </div>
+  </header>
+
+  <section class="metrics" *ngIf="metrics$ | async as metrics">
+    <div class="metric-card">
+      <div class="metric-value">{{ metrics.total }}</div>
+      <div class="metric-label">Всего конфигураций</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ metrics.active }}</div>
+      <div class="metric-label">Активные</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ metrics.inactive }}</div>
+      <div class="metric-label">Неактивные</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ metrics.defaultCount }}</div>
+      <div class="metric-label">Системные по умолчанию</div>
+    </div>
+  </section>
+
+  <div *ngIf="message$ | async as message" class="alert"
+       [ngClass]="message.type === 'success' ? 'alert-success' : message.type === 'warning' ? 'alert-warning' : message.type === 'info' ? 'alert-info' : 'alert-danger'">
+    {{ message.text }}
+  </div>
+
+  <div class="row g-4 align-items-start">
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 anubis-shadow h-100">
+        <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <h2 class="h5 mb-0">Список конфигураций</h2>
+            <p class="text-muted small mb-0">Выберите конфигурацию для редактирования или создайте новую.</p>
+          </div>
+          <form [formGroup]="filtersForm" class="filters" (ngSubmit)="$event.preventDefault()">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="search" class="form-control" placeholder="Поиск по названию или описанию" formControlName="search" />
+            </div>
+            <select class="form-select form-select-sm" formControlName="kind">
+              <option value="all">Все типы</option>
+              <option *ngFor="let kind of storageKinds" [ngValue]="kind">{{ storageKindLabel(kind) }}</option>
+            </select>
+            <select class="form-select form-select-sm" formControlName="status">
+              <option value="all">Все статусы</option>
+              <option value="active">Только активные</option>
+              <option value="inactive">Только неактивные</option>
+            </select>
+          </form>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light text-muted text-uppercase small">
+              <tr>
+                <th scope="col">Название</th>
+                <th scope="col" class="w-25">Тип и расположение</th>
+                <th scope="col" class="text-end">Статус</th>
+                <th scope="col" class="text-end">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let storage of filteredStorages$ | async; trackBy: trackByStorageId"
+                (click)="selectStorage(storage)"
+                [ngClass]="{ 'table-active': isSelected(storage) }"
+              >
+                <td>
+                  <div class="fw-semibold">{{ storage.name || ('Хранилище #' + storage.id) }}</div>
+                  <div class="text-muted small">{{ storage.description || 'Описание не задано' }}</div>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ storageKindLabel(storage.kind) }}</div>
+                  <div class="text-muted small" *ngIf="storageLocation(storage) as location">{{ location }}</div>
+                  <div class="d-flex flex-wrap gap-2 mt-2">
+                    <span class="badge rounded-pill bg-primary-subtle text-primary" *ngIf="storage.isDefault">
+                      Системное по умолчанию
+                    </span>
+                  </div>
+                </td>
+                <td class="text-end">
+                  <span class="status-badge" [ngClass]="storage.isActive ? 'active' : 'inactive'">
+                    {{ storage.isActive ? 'Активно' : 'Неактивно' }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <div class="action-buttons">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-icon"
+                      [disabled]="togglingStatusId === storage.id"
+                      (click)="toggleStatus(storage); $event.stopPropagation()"
+                    >
+                      <i class="fa-solid" [ngClass]="storage.isActive ? 'fa-pause' : 'fa-play'"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-warning btn-icon"
+                      [class.active]="storage.isDefault"
+                      [disabled]="togglingDefaultId === storage.id"
+                      (click)="toggleDefault(storage); $event.stopPropagation()"
+                    >
+                      <i class="fa-solid" [ngClass]="storage.isDefault ? 'fa-star' : 'fa-star-half-stroke'"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger btn-icon"
+                      [disabled]="deletingStorageId === storage.id"
+                      (click)="deleteStorage(storage); $event.stopPropagation()"
+                    >
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="(filteredStorages$ | async)?.length === 0">
+                <td colspan="4" class="text-center text-muted py-4">
+                  {{ isLoading ? 'Загрузка данных...' : 'Конфигурации не найдены.' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-5 mt-4 mt-lg-0">
+      <ng-container *ngIf="isFormVisible; else formPlaceholder">
+        <div class="card border-0 anubis-shadow">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+              <h2 class="h5 mb-0">{{ (selectedStorage$ | async) ? 'Редактирование' : 'Новое хранилище' }}</h2>
+              <p class="text-muted small mb-0" *ngIf="!(selectedStorage$ | async)">
+                Укажите параметры подключения к файловому хранилищу.
+              </p>
+              <p class="text-muted small mb-0" *ngIf="selectedStorage$ | async as storage">
+                Измените параметры хранилища «{{ storage.name || ('Хранилище #' + storage.id) }}».
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelEdit()">
+              <i class="fa-solid fa-xmark me-1"></i>Скрыть
+            </button>
+          </div>
+          <div class="card-body">
+            <form [formGroup]="storageForm" class="d-flex flex-column gap-3" (ngSubmit)="submit()">
+              <div>
+                <label class="form-label">Тип хранилища</label>
+                <select class="form-select" formControlName="kind">
+                  <option *ngFor="let kind of storageKinds" [ngValue]="kind">{{ storageKindLabel(kind) }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Название</label>
+                <input type="text" class="form-control" formControlName="name" [class.is-invalid]="storageForm.get('name')?.invalid && storageForm.get('name')?.touched" />
+                <div class="invalid-feedback">Введите название хранилища.</div>
+              </div>
+              <div>
+                <label class="form-label">Описание</label>
+                <textarea class="form-control" rows="3" formControlName="description" placeholder="Назначение или комментарий"></textarea>
+              </div>
+              <div *ngIf="shouldShowFsFields()">
+                <label class="form-label">Базовый путь (для файловой системы)</label>
+                <input type="text" class="form-control" formControlName="basePath" [class.is-invalid]="storageForm.get('basePath')?.invalid && storageForm.get('basePath')?.touched" />
+                <div class="invalid-feedback">Укажите путь к каталогу для хранения файлов.</div>
+                <div class="form-text">Например: /var/data/anubis</div>
+              </div>
+              <ng-container *ngIf="shouldShowS3Fields()">
+                <div>
+                  <label class="form-label">Bucket</label>
+                  <input type="text" class="form-control" formControlName="bucket" [class.is-invalid]="storageForm.get('bucket')?.invalid && storageForm.get('bucket')?.touched" />
+                  <div class="invalid-feedback">Укажите название bucket.</div>
+                </div>
+                <div>
+                  <label class="form-label">Endpoint</label>
+                  <input type="text" class="form-control" formControlName="endpoint" [class.is-invalid]="storageForm.get('endpoint')?.invalid && storageForm.get('endpoint')?.touched" />
+                  <div class="invalid-feedback">Укажите endpoint сервиса.</div>
+                  <div class="form-text">Например: https://minio.local:9000</div>
+                </div>
+                <div>
+                  <label class="form-label">Access key</label>
+                  <input type="text" class="form-control" formControlName="accessKey" [class.is-invalid]="storageForm.get('accessKey')?.invalid && storageForm.get('accessKey')?.touched" />
+                  <div class="invalid-feedback">Укажите access key.</div>
+                </div>
+                <div>
+                  <label class="form-label">Secret key</label>
+                  <input type="password" class="form-control" formControlName="secretKey" [class.is-invalid]="storageForm.get('secretKey')?.invalid && storageForm.get('secretKey')?.touched" />
+                  <div class="invalid-feedback">Укажите secret key.</div>
+                </div>
+              </ng-container>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="storage-default" formControlName="isDefault" />
+                <label class="form-check-label" for="storage-default">Использовать как системное по умолчанию</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="storage-active" formControlName="isActive" />
+                <label class="form-check-label" for="storage-active">Конфигурация активна</label>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
+                  <i class="fa-solid" [ngClass]="(selectedStorage$ | async) ? 'fa-floppy-disk' : 'fa-plus'"></i>
+                  <span class="ms-2">{{ (selectedStorage$ | async) ? 'Сохранить' : 'Создать' }}</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" (click)="cancelEdit()">
+                  <i class="fa-solid fa-ban"></i>
+                  <span class="ms-2">Отменить</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </ng-container>
+      <ng-template #formPlaceholder>
+        <div class="card border-0 anubis-shadow placeholder-card">
+          <div class="card-body text-center py-5">
+            <i class="fa-solid fa-server display-5 text-primary"></i>
+            <p class="mt-3 mb-0 text-muted">Выберите конфигурацию или создайте новую, чтобы открыть форму.</p>
+          </div>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</section>

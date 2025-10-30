@@ -20,6 +20,7 @@ export class NavigationComponent {
   readonly items: NavItem[] = [
     { label: 'Панель управления', icon: 'fa-solid fa-gauge-high', route: '/dashboard' },
     { label: 'Хранилища', icon: 'fa-solid fa-database', route: '/vaults' },
+    { label: 'Файловые хранилища', icon: 'fa-solid fa-server', route: '/file-storages' },
     { label: 'Объекты', icon: 'fa-solid fa-box-archive', route: '/objects' },
     { label: 'Типы объектов', icon: 'fa-solid fa-diagram-project', route: '/object-types' },
     { label: 'Классы', icon: 'fa-solid fa-layer-group', route: '/classes' },

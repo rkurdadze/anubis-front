@@ -64,9 +64,11 @@ export class DashboardComponent implements OnInit {
     // === Инициализация формы ===
     this.searchForm = this.fb.group({ query: [''] });
 
-    const activeVaults$ = this.vaultApi
-      .getActive()
+    const vaults$ = this.vaultApi
+      .list()
       .pipe(catchError(() => of<Vault[]>([])), shareReplay({ bufferSize: 1, refCount: true }));
+
+    const activeVaults$ = vaults$.pipe(map(items => items.filter(vault => vault.isActive)));
 
     const objectTypes$ = this.objectTypeApi
       .list()
