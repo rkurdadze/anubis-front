@@ -1,0 +1,203 @@
+<section class="container-fluid py-4 vaults-page">
+  <header class="page-header">
+    <div class="page-header__title">
+      <h1 class="h3 mb-1">Хранилища (Vaults)</h1>
+      <p class="text-muted mb-0">Создавайте и управляйте логическими хранилищами данных и их настройками.</p>
+    </div>
+    <div class="page-header__actions">
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refresh()">
+        <i class="fa-solid fa-rotate-right me-1"></i>Обновить
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="startCreate()">
+        <i class="fa-solid fa-plus me-1"></i>Новое хранилище
+      </button>
+    </div>
+  </header>
+
+  <section class="metrics" *ngIf="metrics$ | async as metrics">
+    <div class="metric-card">
+      <div class="metric-value">{{ metrics.total }}</div>
+      <div class="metric-label">Всего</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ metrics.active }}</div>
+      <div class="metric-label">Активные</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ metrics.inactive }}</div>
+      <div class="metric-label">Неактивные</div>
+    </div>
+  </section>
+
+  <div *ngIf="message$ | async as message" class="alert"
+       [ngClass]="message.type === 'success' ? 'alert-success' : message.type === 'warning' ? 'alert-warning' : message.type === 'info' ? 'alert-info' : 'alert-danger'">
+    {{ message.text }}
+  </div>
+
+  <div class="row g-4 align-items-start">
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 anubis-shadow h-100">
+        <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <h2 class="h5 mb-0">Список хранилищ</h2>
+            <p class="text-muted small mb-0">Найдите нужный vault и перейдите к редактированию.</p>
+          </div>
+          <form [formGroup]="filtersForm" class="filters" (ngSubmit)="$event.preventDefault()">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input
+                type="search"
+                class="form-control"
+                placeholder="Поиск по названию или коду"
+                formControlName="search"
+              />
+            </div>
+            <select class="form-select form-select-sm" formControlName="status">
+              <option value="all">Все статусы</option>
+              <option value="active">Только активные</option>
+              <option value="inactive">Только неактивные</option>
+            </select>
+          </form>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light text-muted text-uppercase small">
+              <tr>
+                <th scope="col">Название</th>
+                <th scope="col" class="w-25">Код</th>
+                <th scope="col" class="w-25">Стандартное хранилище</th>
+                <th scope="col" class="text-end">Статус</th>
+                <th scope="col" class="text-end">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let vault of filteredVaults$ | async; trackBy: trackByVaultId"
+                (click)="selectVault(vault)"
+                [ngClass]="{ 'table-active': isSelected(vault) }"
+              >
+                <td>
+                  <div class="fw-semibold">{{ vault.name }}</div>
+                  <div class="text-muted small" *ngIf="vault.description; else noDescription">{{ vault.description }}</div>
+                  <ng-template #noDescription><span class="text-muted small">Описание не задано</span></ng-template>
+                </td>
+                <td>
+                  <span class="badge bg-light text-dark">{{ vault.code }}</span>
+                </td>
+                <td>
+                  <ng-container *ngIf="vault.defaultStorage as storage; else noStorage">
+                    <div class="fw-semibold">{{ storage.name ?? 'Без названия' }}</div>
+                    <div class="text-muted small">
+                      {{ storageKindLabel(storage.kind) }}
+                    </div>
+                  </ng-container>
+                  <ng-template #noStorage>
+                    <span class="text-muted">—</span>
+                  </ng-template>
+                </td>
+                <td class="text-end">
+                  <span class="status-badge" [ngClass]="vault.isActive ? 'active' : 'inactive'">
+                    {{ vault.isActive ? 'Активно' : 'Неактивно' }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <div class="action-buttons">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-icon"
+                      [disabled]="togglingStatusId === vault.id"
+                      (click)="toggleStatus(vault); $event.stopPropagation()"
+                    >
+                      <i class="fa-solid" [ngClass]="vault.isActive ? 'fa-pause' : 'fa-play'"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger btn-icon"
+                      [disabled]="deletingVaultId === vault.id"
+                      (click)="deleteVault(vault); $event.stopPropagation()"
+                    >
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="(filteredVaults$ | async)?.length === 0">
+                <td colspan="5" class="text-center text-muted py-4">
+                  {{ isInitialized ? 'Хранилища не найдены.' : 'Загрузка данных...' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-5 mt-4 mt-lg-0">
+      <ng-container *ngIf="isFormVisible; else formPlaceholder">
+        <div class="card border-0 anubis-shadow">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+              <h2 class="h5 mb-0">{{ (selectedVault$ | async) ? 'Редактирование хранилища' : 'Новое хранилище' }}</h2>
+              <p class="text-muted small mb-0" *ngIf="!(selectedVault$ | async)">
+                Заполните форму, чтобы создать новое хранилище.
+              </p>
+              <p class="text-muted small mb-0" *ngIf="selectedVault$ | async as vault">
+                Измените параметры хранилища «{{ vault.name }}».
+              </p>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelEdit()">
+              <i class="fa-solid fa-xmark me-1"></i>Скрыть
+            </button>
+          </div>
+          <div class="card-body">
+            <form [formGroup]="vaultForm" class="d-flex flex-column gap-3" (ngSubmit)="submit()">
+              <div>
+                <label class="form-label">Название</label>
+                <input type="text" class="form-control" formControlName="name" [class.is-invalid]="vaultForm.get('name')?.invalid && vaultForm.get('name')?.touched" />
+                <div class="invalid-feedback">Введите название.</div>
+              </div>
+              <div>
+                <label class="form-label">Код</label>
+                <input type="text" class="form-control" formControlName="code" [class.is-invalid]="vaultForm.get('code')?.invalid && vaultForm.get('code')?.touched" />
+                <div class="invalid-feedback">Код обязателен.</div>
+              </div>
+              <div>
+                <label class="form-label">Описание</label>
+                <textarea class="form-control" rows="3" formControlName="description" placeholder="Назначение или комментарий"></textarea>
+              </div>
+              <div>
+                <label class="form-label">ID стандартного хранилища</label>
+                <input type="number" min="1" class="form-control" formControlName="defaultStorageId" placeholder="Оставьте пустым, чтобы не назначать" />
+                <div class="form-text">
+                  Для назначения существующего файлового хранилища укажите его идентификатор.
+                </div>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="vault-active" formControlName="isActive" />
+                <label class="form-check-label" for="vault-active">Хранилище активно</label>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
+                  <i class="fa-solid" [ngClass]="(selectedVault$ | async) ? 'fa-floppy-disk' : 'fa-plus'"></i>
+                  <span class="ms-2">{{ (selectedVault$ | async) ? 'Сохранить' : 'Создать' }}</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" (click)="cancelEdit()">
+                  <i class="fa-solid fa-ban"></i>
+                  <span class="ms-2">Отменить</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </ng-container>
+      <ng-template #formPlaceholder>
+        <div class="card border-0 anubis-shadow placeholder-card">
+          <div class="card-body text-center py-5">
+            <i class="fa-solid fa-database display-5 text-primary"></i>
+            <p class="mt-3 mb-0 text-muted">Выберите хранилище или создайте новое, чтобы открыть форму.</p>
+          </div>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</section>

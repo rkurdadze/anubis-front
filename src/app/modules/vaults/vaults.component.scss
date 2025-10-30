@@ -1,0 +1,120 @@
+.vaults-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.vaults-page .page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.vaults-page .page-header__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.vaults-page .metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.vaults-page .metric-card {
+  padding: 1rem 1.25rem;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid var(--bs-border-color);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.vaults-page .metric-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.vaults-page .metric-label {
+  color: var(--bs-gray-600);
+}
+
+.vaults-page .filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vaults-page .filters .search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  background: #fff;
+  min-width: 220px;
+}
+
+.vaults-page .filters .search-box .form-control {
+  border: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+.vaults-page .filters .search-box i {
+  color: var(--bs-gray-500);
+}
+
+.vaults-page .filters .form-select {
+  min-width: 180px;
+}
+
+.vaults-page .status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.vaults-page .status-badge.active {
+  background: rgba(25, 135, 84, 0.12);
+  color: rgb(21, 128, 61);
+}
+
+.vaults-page .status-badge.inactive {
+  background: rgba(220, 53, 69, 0.12);
+  color: rgb(176, 42, 55);
+}
+
+.vaults-page .action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.vaults-page .btn-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+}
+
+.placeholder-card {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}

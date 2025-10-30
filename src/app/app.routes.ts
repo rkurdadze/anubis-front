@@ -15,6 +15,10 @@ export const routes: Routes = [
     loadChildren: () => import('./modules/objects/objects.routes').then(m => m.OBJECTS_ROUTES)
   },
   {
+    path: 'vaults',
+    loadChildren: () => import('./modules/vaults/vaults.routes').then(m => m.VAULTS_ROUTES)
+  },
+  {
     path: 'object-types',
     loadChildren: () => import('./modules/object-types/object-types.routes').then(m => m.OBJECT_TYPES_ROUTES)
   },
