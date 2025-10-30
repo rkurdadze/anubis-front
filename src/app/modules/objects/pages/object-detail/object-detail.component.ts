@@ -360,8 +360,14 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   }
 
   selectVersion(versionId: number | null, triggerReload = true): void {
-    this.selectedVersionSubject.next(versionId);
-    if (triggerReload) {
+    const currentId = this.selectedVersionSubject.value;
+    const hasChanged = currentId !== versionId;
+
+    if (hasChanged) {
+      this.selectedVersionSubject.next(versionId);
+    }
+
+    if (triggerReload && !hasChanged) {
       this.propertiesReload$.next();
       this.filesReload$.next();
       this.auditReload$.next();
