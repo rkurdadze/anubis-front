@@ -35,6 +35,10 @@ export const routes: Routes = [
     loadChildren: () => import('./modules/views/views.routes').then(m => m.VIEWS_ROUTES)
   },
   {
+    path: 'users',
+    loadChildren: () => import('./modules/users/users.routes').then(m => m.USERS_ROUTES)
+  },
+  {
     path: 'search',
     loadChildren: () => import('./modules/search/search.routes').then(m => m.SEARCH_ROUTES)
   },
