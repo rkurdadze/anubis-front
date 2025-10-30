@@ -42,3 +42,53 @@
     font-weight: 600;
   }
 }
+
+.distribution-card {
+  .distribution-progress {
+    height: 0.5rem;
+    border-radius: 999px;
+    background-color: rgba(50, 45, 92, 0.08);
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    background: linear-gradient(90deg, #322d5c, #6c63ff);
+    border-radius: inherit;
+    transition: width 0.3s ease;
+  }
+}
+
+.activity-card {
+  .badge {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .activity-progress {
+    height: 0.45rem;
+    border-radius: 999px;
+    background-color: rgba(50, 45, 92, 0.08);
+    overflow: hidden;
+  }
+
+  .activity-progress-bar {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #ff9f43, #ff6f61);
+    transition: width 0.3s ease;
+  }
+}
+
+.active-vaults-card {
+  .list-group-item {
+    cursor: default;
+    align-items: flex-start;
+
+    .badge {
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+  }
+}

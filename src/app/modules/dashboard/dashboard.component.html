@@ -62,6 +62,75 @@
           </div>
         </div>
       </div>
+
+      <div class="row g-4 mt-1">
+        <div class="col-12 col-xl-6">
+          <div class="card border-0 anubis-shadow h-100 distribution-card">
+            <div class="card-header bg-white">
+              <h2 class="h6 mb-0">Распределение объектов по типам</h2>
+            </div>
+            <div class="card-body">
+              <ng-container *ngIf="objectDistribution$ | async as distribution">
+                <div *ngIf="distribution.length > 0; else distributionEmpty" class="d-flex flex-column gap-3">
+                  <div class="distribution-item" *ngFor="let item of distribution">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <div class="fw-semibold">{{ item.typeName }}</div>
+                      <div class="text-muted small">
+                        {{ item.count }} ({{ item.percentage | number: '1.0-0' }}%)
+                      </div>
+                    </div>
+                    <div class="progress distribution-progress">
+                      <div class="progress-bar" role="progressbar" [style.width.%]="item.percentage"></div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+              <ng-template #distributionEmpty>
+                <div class="text-muted small">
+                  Недостаточно данных для отображения распределения.
+                </div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+          <div class="card border-0 anubis-shadow h-100 activity-card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h2 class="h6 mb-0">Активность за 7 дней</h2>
+              <span class="badge bg-primary-subtle text-primary">
+                Всего: {{ (activityStats$ | async)?.total ?? 0 }}
+              </span>
+            </div>
+            <div class="card-body">
+              <ng-container *ngIf="activityStats$ | async as activity">
+                <div *ngIf="activity.days.length > 0; else activityEmpty" class="d-flex flex-column gap-3">
+                  <div class="activity-item" *ngFor="let day of activity.days">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <span class="text-muted small">{{ day.label }}</span>
+                      <span class="fw-semibold">{{ day.count }}</span>
+                    </div>
+                    <div class="activity-progress mt-1">
+                      <div
+                        class="activity-progress-bar"
+                        [style.width.%]="activity.max ? (day.count / activity.max) * 100 : 0"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="text-muted small" *ngIf="activity.total === 0">
+                    За последнюю неделю новые объекты не создавались.
+                  </div>
+                </div>
+              </ng-container>
+              <ng-template #activityEmpty>
+                <div class="text-muted small">
+                  Данные об активности появятся после создания новых объектов.
+                </div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="col-12 col-xl-4">
@@ -95,6 +164,29 @@
             Введите запрос для поиска по OCR и текстовым документам.
           </div>
         </div>
+      </div>
+
+      <div class="card border-0 anubis-shadow mt-4 active-vaults-card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h2 class="h6 mb-0">Активные хранилища</h2>
+          <span class="badge bg-primary-subtle text-primary">{{ (activeVaults$ | async)?.length ?? 0 }}</span>
+        </div>
+        <ng-container *ngIf="activeVaults$ | async as vaults">
+          <div class="list-group list-group-flush" *ngIf="vaults.length > 0; else noVaults">
+            <div class="list-group-item d-flex justify-content-between align-items-center" *ngFor="let vault of vaults">
+              <div>
+                <div class="fw-semibold">{{ vault.name }}</div>
+                <div class="text-muted small">Код: {{ vault.code }}</div>
+              </div>
+              <span class="badge bg-success-subtle text-success">активно</span>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #noVaults>
+          <div class="px-4 py-3 text-muted small">
+            Нет активных хранилищ для отображения.
+          </div>
+        </ng-template>
       </div>
 
       <div class="card border-0 anubis-shadow mt-4 system-actions-card">
