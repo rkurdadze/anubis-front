@@ -11,11 +11,7 @@ import { PropertyDefinition, PropertyDefinitionRequest } from '../../../../core/
 import { ObjectType } from '../../../../core/models/object-type.model';
 import { ValueList } from '../../../../core/models/value-list.model';
 import { PropertyDataType } from '../../../../core/models/property-data-type.enum';
-
-interface UiMessage {
-  type: 'success' | 'error';
-  text: string;
-}
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-property-definitions',
@@ -30,10 +26,9 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
   private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly valueListApi = inject(ValueListApi);
+  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
-  private messageTimeoutHandle: number | null = null;
   editingProperty: PropertyDefinition | null = null;
   isPropertyFormOpen = false;
 
@@ -54,14 +49,15 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
     isMultiselect: [false],
     regex: [''],
     defaultValue: [''],
-    description: ['']
+    description: [''],
+    captionI18n: ['']
   });
 
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить типы объектов.' });
+      this.showMessage('error', 'Не удалось загрузить типы объектов.');
       return of<ObjectType[]>([]);
     }),
     shareReplay(1)
@@ -70,7 +66,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
   readonly valueLists$ = this.valueListApi.list(0, 500).pipe(
     map(response => response.content ?? []),
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить справочники.' });
+      this.showMessage('error', 'Не удалось загрузить справочники.');
       return of<ValueList[]>([]);
     }),
     shareReplay(1)
@@ -81,7 +77,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       this.propertyDefinitionApi.list(0, 500).pipe(
         map(response => response.content ?? []),
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить свойства.' });
+          this.showMessage('error', 'Не удалось загрузить свойства.');
           return of<PropertyDefinition[]>([]);
         })
       )
@@ -115,28 +111,55 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
   isDeactivatingId: number | null = null;
 
   ngOnInit(): void {
-    this.propertyForm
-      .get('dataType')!
-      .valueChanges.pipe(takeUntil(this.destroy$))
-      .subscribe(type => {
-        const requiresValueList = type === PropertyDataType.VALUELIST || type === PropertyDataType.MULTI_VALUELIST;
-        if (!requiresValueList) {
-          this.propertyForm.get('valueListId')!.setValue(null);
-        }
-        if (type !== PropertyDataType.MULTI_VALUELIST) {
-          this.propertyForm.get('isMultiselect')!.setValue(false, { emitEvent: false });
-        } else {
-          this.propertyForm.get('isMultiselect')!.setValue(true, { emitEvent: false });
-        }
-      });
+    const dataTypeControl = this.propertyForm.get('dataType')!;
+    const valueListControl = this.propertyForm.get('valueListId')!;
+    const multiselectControl = this.propertyForm.get('isMultiselect')!;
+
+    // Инициализация состояний при первом запуске
+    this.updateFormStateByDataType(dataTypeControl.value as PropertyDataType);
+
+    // Подписка на изменения типа данных
+    dataTypeControl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(type => {
+      this.updateFormStateByDataType(type as PropertyDataType);
+    });
   }
 
-  ngOnDestroy(): void {
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
+  /**
+   * Управляет доступностью и значениями полей valueListId и isMultiselect
+   * в зависимости от выбранного типа данных.
+   */
+  private updateFormStateByDataType(type: PropertyDataType): void {
+    const valueListControl = this.propertyForm.get('valueListId')!;
+    const multiselectControl = this.propertyForm.get('isMultiselect')!;
+
+    const requiresValueList =
+      type === PropertyDataType.VALUELIST || type === PropertyDataType.MULTI_VALUELIST;
+
+    // === Управление справочником (valueListId) ===
+    if (requiresValueList) {
+      if (valueListControl.disabled) valueListControl.enable({ emitEvent: false });
+    } else {
+      if (valueListControl.enabled) {
+        valueListControl.disable({ emitEvent: false });
+        valueListControl.setValue(null, { emitEvent: false });
+      }
     }
+
+    // === Управление флагом множественного выбора ===
+    if (type === PropertyDataType.MULTI_VALUELIST) {
+      multiselectControl.setValue(true, { emitEvent: false });
+      if (multiselectControl.enabled) multiselectControl.disable({ emitEvent: false });
+    } else {
+      if (multiselectControl.disabled) multiselectControl.enable({ emitEvent: false });
+      multiselectControl.setValue(false, { emitEvent: false });
+    }
+  }
+
+
+  ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 
   startCreate(): void {
@@ -151,7 +174,8 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       isMultiselect: false,
       regex: '',
       defaultValue: '',
-      description: ''
+      description: '',
+      captionI18n: ''
     });
     this.isPropertyFormOpen = true;
   }
@@ -168,7 +192,8 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       isMultiselect: property.isMultiselect ?? false,
       regex: property.regex ?? '',
       defaultValue: property.defaultValue ?? '',
-      description: property.description ?? ''
+      description: property.description ?? '',
+      captionI18n: property.captionI18n ? JSON.stringify(property.captionI18n, null, 2) : ''
     });
     this.isPropertyFormOpen = true;
   }
@@ -185,7 +210,8 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       isMultiselect: false,
       regex: '',
       defaultValue: '',
-      description: ''
+      description: '',
+      captionI18n: ''
     });
     this.isPropertyFormOpen = false;
   }
@@ -226,6 +252,10 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
     }
 
     const value = this.propertyForm.getRawValue();
+    const captionI18n = this.parseJson(value.captionI18n ?? '');
+    if (captionI18n === null) {
+      return;
+    }
     const payload: PropertyDefinitionRequest = {
       name: value.name!.trim(),
       dataType: value.dataType!,
@@ -236,14 +266,14 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       isMultiselect: value.isMultiselect ?? false,
       regex: value.regex?.trim() || undefined,
       defaultValue: value.defaultValue?.trim() || undefined,
-      captionI18n: undefined,
+      captionI18n: captionI18n,
       description: value.description?.trim() || undefined
     };
 
     const requiresValueList =
       payload.dataType === PropertyDataType.VALUELIST || payload.dataType === PropertyDataType.MULTI_VALUELIST;
     if (requiresValueList && !payload.valueListId) {
-      this.setMessage({ type: 'error', text: 'Для выбранного типа необходимо указать справочник.' });
+      this.showMessage('error', 'Для выбранного типа необходимо указать справочник.');
       return;
     }
 
@@ -255,13 +285,13 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: updated => {
-            this.setMessage({ type: 'success', text: `Свойство «${updated.name}» обновлено.` });
+            this.showMessage('success', `Свойство «${updated.name}» обновлено.`);
             this.refresh();
             this.startCreate();
             this.isSaving = false;
           },
           error: () => {
-            this.setMessage({ type: 'error', text: 'Не удалось сохранить изменения свойства.' });
+            this.showMessage('error', 'Не удалось сохранить изменения свойства.');
             this.isSaving = false;
           }
         });
@@ -273,13 +303,13 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: created => {
-          this.setMessage({ type: 'success', text: `Свойство «${created.name}» создано.` });
+          this.showMessage('success', `Свойство «${created.name}» создано.`);
           this.refresh();
           this.startEdit(created);
           this.isSaving = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось создать свойство.' });
+          this.showMessage('error', 'Не удалось создать свойство.');
           this.isSaving = false;
         }
       });
@@ -300,7 +330,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: `Свойство «${property.name}» удалено.` });
+          this.showMessage('success', `Свойство «${property.name}» удалено.`);
           this.refresh();
           if (this.editingProperty?.id === property.id) {
             this.startCreate();
@@ -308,7 +338,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
           this.isDeletingId = null;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить свойство.' });
+          this.showMessage('error', 'Не удалось удалить свойство.');
           this.isDeletingId = null;
         }
       });
@@ -321,12 +351,12 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: `Свойство «${property.name}» деактивировано.` });
+          this.showMessage('success', `Свойство «${property.name}» деактивировано.`);
           this.refresh();
           this.isDeactivatingId = null;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось деактивировать свойство.' });
+          this.showMessage('error', 'Не удалось деактивировать свойство.');
           this.isDeactivatingId = null;
         }
       });
@@ -340,11 +370,21 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
     this.reload$.next();
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
+  private parseJson(value: string): Record<string, string> | undefined | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
     }
-    this.messageTimeoutHandle = window.setTimeout(() => this.messageSubject.next(null), 5000);
+
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      this.showMessage('error', 'Некорректный JSON для локализаций подписи.');
+      return null;
+    }
+  }
+
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 }

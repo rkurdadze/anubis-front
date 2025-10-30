@@ -6,11 +6,7 @@ import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'r
 
 import { ValueListApi } from '../../../../core/api/value-list.api';
 import { ValueList, ValueListItem } from '../../../../core/models/value-list.model';
-
-interface UiMessage {
-  type: 'success' | 'error';
-  text: string;
-}
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-value-lists-overview',
@@ -23,12 +19,11 @@ interface UiMessage {
 export class ValueListsOverviewComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly valueListApi = inject(ValueListApi);
+  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private readonly itemsReload$ = new BehaviorSubject<void>(undefined);
   private readonly selectedListId$ = new BehaviorSubject<number | null>(null);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
-  private messageTimeoutHandle: number | null = null;
   private currentListId: number | null = null;
   isListFormOpen = false;
 
@@ -52,14 +47,14 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
     isActive: [true]
   });
 
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly valueLists$ = this.reload$.pipe(
     switchMap(() =>
       this.valueListApi.list(0, 500).pipe(
         map(response => response.content ?? []),
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить справочники.' });
+          this.showMessage('error', 'Не удалось загрузить справочники.');
           return of<ValueList[]>([]);
         })
       )
@@ -97,7 +92,7 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
 
       return this.valueListApi.listItems(listId).pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить элементы справочника.' });
+          this.showMessage('error', 'Не удалось загрузить элементы справочника.');
           return of<ValueListItem[]>([]);
         })
       );
@@ -131,11 +126,9 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 
   selectList(list: ValueList): void {
@@ -213,12 +206,12 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: updated => {
-            this.setMessage({ type: 'success', text: `Справочник «${updated.name}» обновлён.` });
+            this.showMessage('success', `Справочник «${updated.name}» обновлён.`);
             this.refresh();
             this.isSavingList = false;
           },
           error: () => {
-            this.setMessage({ type: 'error', text: 'Не удалось сохранить справочник.' });
+            this.showMessage('error', 'Не удалось сохранить справочник.');
             this.isSavingList = false;
           }
         });
@@ -230,13 +223,13 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: created => {
-          this.setMessage({ type: 'success', text: `Справочник «${created.name}» создан.` });
+          this.showMessage('success', `Справочник «${created.name}» создан.`);
           this.refresh();
           this.selectedListId$.next(created.id);
           this.isSavingList = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось создать справочник.' });
+          this.showMessage('error', 'Не удалось создать справочник.');
           this.isSavingList = false;
         }
       });
@@ -257,7 +250,7 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: `Справочник «${list.name}» удалён.` });
+          this.showMessage('success', `Справочник «${list.name}» удалён.`);
           this.refresh();
           if (this.currentListId === list.id) {
             this.startCreate();
@@ -265,7 +258,7 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
           this.deletingListId = null;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить справочник.' });
+          this.showMessage('error', 'Не удалось удалить справочник.');
           this.deletingListId = null;
         }
       });
@@ -273,7 +266,7 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
 
   createItem(): void {
     if (!this.currentListId) {
-      this.setMessage({ type: 'error', text: 'Выберите справочник для добавления значений.' });
+      this.showMessage('error', 'Выберите справочник для добавления значений.');
       return;
     }
 
@@ -305,13 +298,13 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Элемент справочника добавлен.' });
+          this.showMessage('success', 'Элемент справочника добавлен.');
           this.itemForm.reset({ value: '', valueI18n: '', sortOrder: 0, parentItemId: null, externalCode: '', isActive: true });
           this.itemsReload$.next();
           this.isSavingItem = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось добавить элемент.' });
+          this.showMessage('error', 'Не удалось добавить элемент.');
           this.isSavingItem = false;
         }
       });
@@ -332,12 +325,12 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Элемент удалён.' });
+          this.showMessage('success', 'Элемент удалён.');
           this.itemsReload$.next();
           this.deletingItemId = null;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить элемент.' });
+          this.showMessage('error', 'Не удалось удалить элемент.');
           this.deletingItemId = null;
         }
       });
@@ -349,11 +342,11 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Элемент деактивирован.' });
+          this.showMessage('success', 'Элемент деактивирован.');
           this.itemsReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось деактивировать элемент.' });
+          this.showMessage('error', 'Не удалось деактивировать элемент.');
         }
       });
   }
@@ -379,16 +372,12 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
     try {
       return JSON.parse(trimmed);
     } catch (err) {
-      this.setMessage({ type: 'error', text: 'Некорректный JSON для локализаций.' });
+      this.showMessage('error', 'Некорректный JSON для локализаций.');
       return null;
     }
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
-    this.messageTimeoutHandle = window.setTimeout(() => this.messageSubject.next(null), 5000);
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 }

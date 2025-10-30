@@ -14,11 +14,7 @@ import {
 } from '../../../../core/models/class.model';
 import { ObjectType } from '../../../../core/models/object-type.model';
 import { PropertyDefinition } from '../../../../core/models/property-def.model';
-
-interface UiMessage {
-  type: 'success' | 'error';
-  text: string;
-}
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-classes-overview',
@@ -33,12 +29,11 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   private readonly classApi = inject(ClassApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
+  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private readonly bindingsReload$ = new BehaviorSubject<void>(undefined);
   private readonly selectedClassId$ = new BehaviorSubject<number | null>(null);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
-  private messageTimeoutHandle: number | null = null;
   private currentClassId: number | null = null;
 
   readonly filterForm = this.fb.group({
@@ -61,11 +56,11 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
     displayOrder: [0]
   });
 
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить список типов объектов.' });
+      this.showMessage('error', 'Не удалось загрузить список типов объектов.');
       return of<ObjectType[]>([]);
     }),
     shareReplay(1)
@@ -74,7 +69,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   readonly properties$ = this.propertyDefinitionApi.list(0, 500).pipe(
     map(response => response.content ?? []),
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить список свойств.' });
+      this.showMessage('error', 'Не удалось загрузить список свойств.');
       return of<PropertyDefinition[]>([]);
     }),
     shareReplay(1)
@@ -85,7 +80,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
       this.classApi.list(0, 500).pipe(
         map(response => response.content ?? []),
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось получить список классов.' });
+          this.showMessage('error', 'Не удалось получить список классов.');
           return of<ObjectClass[]>([]);
         })
       )
@@ -131,7 +126,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
 
       return this.classApi.listBindings(classId).pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить привязки свойств.' });
+          this.showMessage('error', 'Не удалось загрузить привязки свойств.');
           return of<ClassPropertyBinding[]>([]);
         })
       );
@@ -165,11 +160,9 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 
   selectClass(cls: ObjectClass): void {
@@ -243,12 +236,12 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: updated => {
-            this.setMessage({ type: 'success', text: `Класс «${updated.name}» обновлён.` });
+            this.showMessage('success', `Класс «${updated.name}» обновлён.`);
             this.refresh();
             this.isSavingClass = false;
           },
           error: () => {
-            this.setMessage({ type: 'error', text: 'Не удалось сохранить класс.' });
+            this.showMessage('error', 'Не удалось сохранить класс.');
             this.isSavingClass = false;
           }
         });
@@ -260,13 +253,13 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: created => {
-          this.setMessage({ type: 'success', text: `Класс «${created.name}» создан.` });
+          this.showMessage('success', `Класс «${created.name}» создан.`);
           this.refresh();
           this.selectedClassId$.next(created.id);
           this.isSavingClass = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось создать класс.' });
+          this.showMessage('error', 'Не удалось создать класс.');
           this.isSavingClass = false;
         }
       });
@@ -287,7 +280,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: `Класс «${cls.name}» удалён.` });
+          this.showMessage('success', `Класс «${cls.name}» удалён.`);
           this.refresh();
           if (this.currentClassId === cls.id) {
             this.startCreate();
@@ -295,7 +288,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
           this.deletingClassId = null;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить класс.' });
+          this.showMessage('error', 'Не удалось удалить класс.');
           this.deletingClassId = null;
         }
       });
@@ -303,7 +296,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
 
   createBinding(): void {
     if (!this.currentClassId) {
-      this.setMessage({ type: 'error', text: 'Выберите класс для добавления привязки.' });
+      this.showMessage('error', 'Выберите класс для добавления привязки.');
       return;
     }
 
@@ -327,13 +320,13 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Привязка свойства создана.' });
+          this.showMessage('success', 'Привязка свойства создана.');
           this.bindingForm.reset({ propertyDefId: null, isReadonly: false, isHidden: false, displayOrder: 0 });
           this.bindingsReload$.next();
           this.isSavingBinding = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось создать привязку свойства.' });
+          this.showMessage('error', 'Не удалось создать привязку свойства.');
           this.isSavingBinding = false;
         }
       });
@@ -354,12 +347,12 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Привязка удалена.' });
+          this.showMessage('success', 'Привязка удалена.');
           this.bindingsReload$.next();
           this.deletingBindingId = null;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить привязку.' });
+          this.showMessage('error', 'Не удалось удалить привязку.');
           this.deletingBindingId = null;
         }
       });
@@ -371,11 +364,11 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Привязка деактивирована.' });
+          this.showMessage('success', 'Привязка деактивирована.');
           this.bindingsReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось деактивировать привязку.' });
+          this.showMessage('error', 'Не удалось деактивировать привязку.');
         }
       });
   }
@@ -392,11 +385,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
     this.reload$.next();
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
-    this.messageTimeoutHandle = window.setTimeout(() => this.messageSubject.next(null), 5000);
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 }

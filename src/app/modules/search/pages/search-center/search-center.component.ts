@@ -5,11 +5,7 @@ import { BehaviorSubject, Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, takeUntil, tap } from 'rxjs/operators';
 
 import { SearchApi } from '../../../../core/api/search.api';
-
-interface UiMessage {
-  type: 'success' | 'error';
-  text: string;
-}
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-search-center',
@@ -22,13 +18,12 @@ interface UiMessage {
 export class SearchCenterComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly searchApi = inject(SearchApi);
+  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly resultsSubject = new BehaviorSubject<number[]>([]);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
-  private messageTimeoutHandle: number | null = null;
 
   readonly results$ = this.resultsSubject.asObservable();
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly searchForm = this.fb.group({
     query: ['', [Validators.required, Validators.minLength(3)]],
@@ -67,7 +62,7 @@ export class SearchCenterComponent implements OnDestroy {
       .search(query)
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось выполнить поиск.' });
+          this.showMessage('error', 'Не удалось выполнить поиск.');
           return of<number[]>([]);
         }),
         takeUntil(this.destroy$)
@@ -93,14 +88,14 @@ export class SearchCenterComponent implements OnDestroy {
       .reindexAll()
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось запустить переиндексацию.' });
+          this.showMessage('error', 'Не удалось запустить переиндексацию.');
           return of('');
         }),
         takeUntil(this.destroy$)
       )
       .subscribe(message => {
         if (message) {
-          this.setMessage({ type: 'success', text: message });
+          this.showMessage('success', message);
         }
         this.isReindexing = false;
       });
@@ -116,14 +111,14 @@ export class SearchCenterComponent implements OnDestroy {
       .reindexVersion(versionId)
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось переиндексировать версию.' });
+          this.showMessage('error', 'Не удалось переиндексировать версию.');
           return of('');
         }),
         takeUntil(this.destroy$)
       )
       .subscribe(message => {
         if (message) {
-          this.setMessage({ type: 'success', text: message });
+          this.showMessage('success', message);
         }
         this.reindexVersionId = null;
       });
@@ -133,19 +128,13 @@ export class SearchCenterComponent implements OnDestroy {
     return item;
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
-    this.messageTimeoutHandle = window.setTimeout(() => this.messageSubject.next(null), 5000);
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 
   ngOnDestroy(): void {
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 }

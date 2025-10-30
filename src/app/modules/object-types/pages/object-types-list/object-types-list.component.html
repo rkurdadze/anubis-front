@@ -53,14 +53,14 @@
                 <td class="text-muted">#{{ type.id }}</td>
                 <td class="fw-semibold">{{ type.name }}</td>
                 <td class="text-end">
-                  <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-primary" (click)="startEdit(type)">
+                  <div class="action-buttons">
+                    <button type="button" class="btn btn-outline-primary btn-icon" (click)="startEdit(type)">
                       <i class="fa-solid fa-pen"></i>
                       <span class="visually-hidden">Редактировать</span>
                     </button>
                     <button
                       type="button"
-                      class="btn btn-outline-danger"
+                      class="btn btn-outline-danger btn-icon"
                       [disabled]="deletingId === type.id"
                       (click)="delete(type)"
                     >

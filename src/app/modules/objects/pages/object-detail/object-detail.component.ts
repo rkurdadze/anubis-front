@@ -40,11 +40,7 @@ import { LinkRole } from '../../../../core/models/link-role.model';
 import { LinkDirection } from '../../../../core/models/object-link-direction.enum';
 import { ObjectVersionAudit } from '../../../../core/models/object-version-audit.model';
 import { PropertyDataType } from '../../../../core/models/property-data-type.enum';
-
-interface UiMessage {
-  type: 'success' | 'error' | 'info';
-  text: string;
-}
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 interface VersionWithAudit {
   version: ObjectVersion | null;
@@ -94,6 +90,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly fileApi = inject(FileApi);
   private readonly objectLinkApi = inject(ObjectLinkApi);
   private readonly linkRoleApi = inject(LinkRoleApi);
+  private readonly uiMessages = inject(UiMessageService).create();
 
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
@@ -102,14 +99,13 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly linksReload$ = new BehaviorSubject<void>(undefined);
   private readonly auditReload$ = new BehaviorSubject<void>(undefined);
   private readonly selectedVersionSubject = new BehaviorSubject<number | null>(null);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
 
   private propertyDefinitions: PropertyDefinition[] = [];
   private propertyDefinitionMap = new Map<number, PropertyDefinition>();
   private classesCache: ObjectClass[] = [];
   private typesCache: ObjectType[] = [];
 
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly objectForm = this.fb.group({
     name: this.fb.nonNullable.control('', { validators: [Validators.required, Validators.maxLength(255)] }),
@@ -133,7 +129,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     map(id => (Number.isFinite(id) ? id : NaN)),
     tap(id => {
       if (Number.isNaN(id)) {
-        this.setMessage({ type: 'error', text: 'Некорректный идентификатор объекта.' });
+        this.showMessage('error', 'Некорректный идентификатор объекта.');
       }
     }),
     shareReplay(1)
@@ -145,7 +141,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         ? of<RepositoryObject | null>(null)
         : this.objectApi.get(objectId).pipe(
             catchError(() => {
-              this.setMessage({ type: 'error', text: 'Не удалось загрузить объект.' });
+              this.showMessage('error', 'Не удалось загрузить объект.');
               return of<RepositoryObject | null>(null);
             })
           )
@@ -170,7 +166,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       this.typesCache = types;
     }),
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить типы объектов.' });
+      this.showMessage('error', 'Не удалось загрузить типы объектов.');
       return of<ObjectType[]>([]);
     }),
     shareReplay(1)
@@ -182,7 +178,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       this.classesCache = classes;
     }),
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить классы.' });
+      this.showMessage('error', 'Не удалось загрузить классы.');
       return of<ObjectClass[]>([]);
     }),
     shareReplay(1)
@@ -202,7 +198,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         : this.objectVersionApi.listByObject(objectId).pipe(
             map(versions => versions.slice().sort((a, b) => b.versionNum - a.versionNum)),
             catchError(() => {
-              this.setMessage({ type: 'error', text: 'Не удалось загрузить версии объекта.' });
+              this.showMessage('error', 'Не удалось загрузить версии объекта.');
               return of<ObjectVersion[]>([]);
             })
           )
@@ -225,7 +221,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       }
       return this.objectVersionApi.get(versionId).pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить данные версии.' });
+          this.showMessage('error', 'Не удалось загрузить данные версии.');
           return of<ObjectVersionDetail | null>(null);
         })
       );
@@ -244,7 +240,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       return this.objectVersionApi.getAudit(version.id).pipe(
         map(audit => ({ version, audit })),
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить журнал аудита версии.' });
+          this.showMessage('error', 'Не удалось загрузить журнал аудита версии.');
           return of<VersionWithAudit>({ version, audit: [] });
         })
       );
@@ -303,7 +299,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       this.propertyDefinitionMap = new Map(defs.map(def => [def.id, def]));
     }),
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить определения свойств.' });
+      this.showMessage('error', 'Не удалось загрузить определения свойств.');
       return of<PropertyDefinition[]>([]);
     }),
     shareReplay(1)
@@ -316,7 +312,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       }
       return this.propertyValueApi.get(versionId).pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить значения свойств.' });
+          this.showMessage('error', 'Не удалось загрузить значения свойств.');
           return of<PropertyValue[]>([]);
         })
       );
@@ -331,7 +327,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         ? of<ObjectFile[]>([])
         : this.fileApi.listByObject(objectId).pipe(
             catchError(() => {
-              this.setMessage({ type: 'error', text: 'Не удалось загрузить файлы объекта.' });
+              this.showMessage('error', 'Не удалось загрузить файлы объекта.');
               return of<ObjectFile[]>([]);
             })
           )
@@ -346,7 +342,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       }
       return this.fileApi.listByVersion(versionId).pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить файлы версии.' });
+          this.showMessage('error', 'Не удалось загрузить файлы версии.');
           return of<ObjectFile[]>([]);
         })
       );
@@ -360,7 +356,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         ? of<ObjectLink[]>([])
         : this.objectLinkApi.get(objectId).pipe(
             catchError(() => {
-              this.setMessage({ type: 'error', text: 'Не удалось загрузить связи объекта.' });
+              this.showMessage('error', 'Не удалось загрузить связи объекта.');
               return of<ObjectLink[]>([]);
             })
           )
@@ -370,7 +366,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
 
   readonly linkRoles$ = this.linkRoleApi.list().pipe(
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить роли связей.' });
+      this.showMessage('error', 'Не удалось загрузить роли связей.');
       return of<LinkRole[]>([]);
     }),
     shareReplay(1)
@@ -400,6 +396,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 
   get propertiesControls(): PropertyFormGroup[] {
@@ -457,12 +454,12 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: updated => {
-          this.setMessage({ type: 'success', text: `Объект «${updated.name}» обновлён.` });
+          this.showMessage('success', `Объект «${updated.name}» обновлён.`);
           this.isSavingObject = false;
           this.reload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось сохранить изменения объекта.' });
+          this.showMessage('error', 'Не удалось сохранить изменения объекта.');
           this.isSavingObject = false;
         }
       });
@@ -501,13 +498,13 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Свойства успешно сохранены.' });
+          this.showMessage('success', 'Свойства успешно сохранены.');
           this.isSavingProperties = false;
           this.propertiesReload$.next();
           this.auditReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось сохранить свойства.' });
+          this.showMessage('error', 'Не удалось сохранить свойства.');
           this.isSavingProperties = false;
         }
       });
@@ -531,7 +528,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
           window.URL.revokeObjectURL(url);
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось скачать файл.' });
+          this.showMessage('error', 'Не удалось скачать файл.');
         }
       });
   }
@@ -551,12 +548,12 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Файл загружен.' });
+          this.showMessage('success', 'Файл загружен.');
           this.isUploadingFile = false;
           this.filesReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить файл.' });
+          this.showMessage('error', 'Не удалось загрузить файл.');
           this.isUploadingFile = false;
         }
       });
@@ -575,12 +572,12 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Файл обновлён.' });
+          this.showMessage('success', 'Файл обновлён.');
           this.isUploadingFile = false;
           this.filesReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось заменить файл.' });
+          this.showMessage('error', 'Не удалось заменить файл.');
           this.isUploadingFile = false;
         }
       });
@@ -596,11 +593,11 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Файл удалён.' });
+          this.showMessage('success', 'Файл удалён.');
           this.filesReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить файл.' });
+          this.showMessage('error', 'Не удалось удалить файл.');
         }
       });
   }
@@ -616,7 +613,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     const value = this.linkForm.getRawValue();
     const targetId = Number(value.targetId);
     if (!Number.isFinite(targetId)) {
-      this.setMessage({ type: 'error', text: 'Укажите корректный идентификатор объекта.' });
+      this.showMessage('error', 'Укажите корректный идентификатор объекта.');
       return;
     }
     this.isLinkActionInProgress = true;
@@ -625,13 +622,13 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Связь создана.' });
+          this.showMessage('success', 'Связь создана.');
           this.isLinkActionInProgress = false;
           this.linkForm.reset({ targetId: null, role: '', direction: LinkDirection.UNI });
           this.linksReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось создать связь.' });
+          this.showMessage('error', 'Не удалось создать связь.');
           this.isLinkActionInProgress = false;
         }
       });
@@ -644,7 +641,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     this.isLinkActionInProgress = true;
     const roleIdentifier = link.roleName ?? String(link.roleId ?? '');
     if (!roleIdentifier) {
-      this.setMessage({ type: 'error', text: 'Не удалось определить роль связи для удаления.' });
+      this.showMessage('error', 'Не удалось определить роль связи для удаления.');
       this.isLinkActionInProgress = false;
       return;
     }
@@ -653,12 +650,12 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: 'Связь удалена.' });
+          this.showMessage('success', 'Связь удалена.');
           this.isLinkActionInProgress = false;
           this.linksReload$.next();
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить связь.' });
+          this.showMessage('error', 'Не удалось удалить связь.');
           this.isLinkActionInProgress = false;
         }
       });
@@ -766,10 +763,10 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   }
 
   dismissMessage(): void {
-    this.messageSubject.next(null);
+    this.uiMessages.dismiss();
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 }

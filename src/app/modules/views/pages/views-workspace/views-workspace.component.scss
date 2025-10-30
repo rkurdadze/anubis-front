@@ -2,31 +2,10 @@
   max-width: 1320px;
   margin: 0 auto;
 
-  .card {
-    border-radius: 1rem;
-  }
-
-  .section-stack {
-    display: grid;
-    gap: 1.5rem;
-  }
-
-  .list-group-item.active {
-    background-color: rgba(13, 110, 253, 0.1);
-    border-color: rgba(13, 110, 253, 0.2);
-  }
-
   .table {
     font-size: 0.9rem;
   }
 
-  .placeholder-card {
-    min-height: 320px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-  }
 }
 
 .views-workspace__switch {

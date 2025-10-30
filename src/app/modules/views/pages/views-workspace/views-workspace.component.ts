@@ -8,11 +8,7 @@ import { ObjectViewApi } from '../../../../core/api/view.api';
 import { ObjectView } from '../../../../core/models/object-view.model';
 import { RepositoryObject } from '../../../../core/models/object.model';
 import { ObjectVersion } from '../../../../core/models/object-version.model';
-
-interface UiMessage {
-  type: 'success' | 'error';
-  text: string;
-}
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-views-workspace',
@@ -25,19 +21,18 @@ interface UiMessage {
 export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly objectViewApi = inject(ObjectViewApi);
+  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly viewsSubject = new BehaviorSubject<ObjectView[]>([]);
   private readonly resultsSubject = new BehaviorSubject<RepositoryObject[]>([]);
   private readonly aclResultsSubject = new BehaviorSubject<ObjectVersion[]>([]);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
-  private messageTimeoutHandle: number | null = null;
   selectedView: ObjectView | null = null;
   isViewFormOpen = false;
 
   readonly views$ = this.viewsSubject.asObservable();
   readonly executionResults$ = this.resultsSubject.asObservable();
   readonly aclResults$ = this.aclResultsSubject.asObservable();
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly userForm = this.fb.group({
     userId: [1, [Validators.required, Validators.min(1)]],
@@ -72,7 +67,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       .available(userId)
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить представления.' });
+          this.showMessage('error', 'Не удалось загрузить представления.');
           return of<ObjectView[]>([]);
         }),
         takeUntil(this.destroy$)
@@ -181,7 +176,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     save$
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось сохранить представление.' });
+          this.showMessage('error', 'Не удалось сохранить представление.');
           this.isSaving = false;
           return of<ObjectView | null>(null);
         }),
@@ -191,7 +186,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
         if (!result) {
           return;
         }
-        this.setMessage({ type: 'success', text: `Представление «${result.name}» сохранено.` });
+        this.showMessage('success', `Представление «${result.name}» сохранено.`);
         this.isSaving = false;
         this.loadViews();
         this.applySelection(result);
@@ -207,13 +202,13 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       .delete(view.id)
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить представление.' });
+          this.showMessage('error', 'Не удалось удалить представление.');
           return of<void>(undefined);
         }),
         takeUntil(this.destroy$)
       )
       .subscribe(() => {
-        this.setMessage({ type: 'success', text: `Представление «${view.name}» удалено.` });
+        this.showMessage('success', `Представление «${view.name}» удалено.`);
         if (this.selectedView?.id === view.id) {
           this.resetForm();
         }
@@ -227,7 +222,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       .execute(view.id)
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось выполнить представление.' });
+          this.showMessage('error', 'Не удалось выполнить представление.');
           this.isExecuting = false;
           return of<RepositoryObject[]>([]);
         }),
@@ -250,7 +245,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       .executeWithAcl(view.id, userId)
       .pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось выполнить представление с учётом ACL.' });
+          this.showMessage('error', 'Не удалось выполнить представление с учётом ACL.');
           return of<ObjectVersion[]>([]);
         }),
         takeUntil(this.destroy$)
@@ -293,29 +288,23 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     try {
       const parsed = JSON.parse(trimmed);
       if (expectArray && !Array.isArray(parsed)) {
-        this.setMessage({ type: 'error', text: 'Группировки должны быть массивом объектов.' });
+        this.showMessage('error', 'Группировки должны быть массивом объектов.');
         return null;
       }
       return parsed;
     } catch (err) {
-      this.setMessage({ type: 'error', text: 'Неверный JSON формат.' });
+      this.showMessage('error', 'Неверный JSON формат.');
       return null;
     }
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
-    this.messageTimeoutHandle = window.setTimeout(() => this.messageSubject.next(null), 5000);
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 
   ngOnDestroy(): void {
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 }

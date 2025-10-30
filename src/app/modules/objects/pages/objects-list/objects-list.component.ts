@@ -11,15 +11,11 @@ import { ClassApi } from '../../../../core/api/class.api';
 import { RepositoryObject, RepositoryObjectRequest } from '../../../../core/models/object.model';
 import { ObjectClass } from '../../../../core/models/class.model';
 import { ObjectType } from '../../../../core/models/object-type.model';
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 interface ObjectsListItem extends RepositoryObject {
   typeName?: string;
   className?: string;
-}
-
-interface UiMessage {
-  type: 'success' | 'error';
-  text: string;
 }
 
 @Component({
@@ -35,10 +31,9 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   private readonly objectApi = inject(ObjectApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly classApi = inject(ClassApi);
+  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
-  private messageTimeoutHandle: number | null = null;
 
   readonly filterForm = this.fb.group({
     search: [''],
@@ -53,11 +48,11 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     classId: [null as number | null]
   });
 
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить типы объектов.' });
+      this.showMessage('error', 'Не удалось загрузить типы объектов.');
       return of<ObjectType[]>([]);
     }),
     shareReplay(1)
@@ -65,7 +60,7 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   readonly classes$ = this.classApi.list(0, 500).pipe(
     map(response => response.content ?? []),
     catchError(() => {
-      this.setMessage({ type: 'error', text: 'Не удалось загрузить список классов.' });
+      this.showMessage('error', 'Не удалось загрузить список классов.');
       return of<ObjectClass[]>([]);
     }),
     shareReplay(1)
@@ -89,7 +84,7 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     switchMap(() =>
       this.objectApi.list().pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить список объектов.' });
+          this.showMessage('error', 'Не удалось загрузить список объектов.');
           return of<RepositoryObject[]>([]);
         })
       )
@@ -151,11 +146,9 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 
   toggleCreatePanel(): void {
@@ -188,13 +181,13 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: created => {
-          this.setMessage({ type: 'success', text: `Объект «${created.name}» создан.` });
+          this.showMessage('success', `Объект «${created.name}» создан.`);
           this.toggleCreatePanel();
           this.refresh();
           this.isPerformingAction = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось создать объект. Попробуйте ещё раз.' });
+          this.showMessage('error', 'Не удалось создать объект. Попробуйте ещё раз.');
           this.isPerformingAction = false;
         }
       });
@@ -213,12 +206,12 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: clone => {
-          this.setMessage({ type: 'success', text: `Создан клон «${clone.name}».` });
+          this.showMessage('success', `Создан клон «${clone.name}».`);
           this.refresh();
           this.isPerformingAction = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось клонировать объект.' });
+          this.showMessage('error', 'Не удалось клонировать объект.');
           this.isPerformingAction = false;
         }
       });
@@ -239,12 +232,12 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: `Объект «${object.name}» перемещён в корзину.` });
+          this.showMessage('success', `Объект «${object.name}» перемещён в корзину.`);
           this.refresh();
           this.isPerformingAction = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить объект.' });
+          this.showMessage('error', 'Не удалось удалить объект.');
           this.isPerformingAction = false;
         }
       });
@@ -261,37 +254,26 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: `Объект «${object.name}» удалён без возможности восстановления.` });
+          this.showMessage('success', `Объект «${object.name}» удалён без возможности восстановления.`);
           this.refresh();
           this.isPerformingAction = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось выполнить жесткое удаление.' });
+          this.showMessage('error', 'Не удалось выполнить жесткое удаление.');
           this.isPerformingAction = false;
         }
       });
   }
 
   dismissMessage(): void {
-    this.messageSubject.next(null);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-      this.messageTimeoutHandle = null;
-    }
+    this.uiMessages.dismiss();
   }
 
   trackByObjectId(index: number, item: ObjectsListItem): number {
     return item.id;
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
-    this.messageTimeoutHandle = window.setTimeout(() => {
-      this.messageSubject.next(null);
-      this.messageTimeoutHandle = null;
-    }, 5000);
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 }

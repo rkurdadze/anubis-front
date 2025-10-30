@@ -6,11 +6,7 @@ import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'r
 
 import { ObjectTypeApi } from '../../../../core/api/object-type.api';
 import { ObjectType } from '../../../../core/models/object-type.model';
-
-interface UiMessage {
-  type: 'success' | 'error';
-  text: string;
-}
+import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-object-types-list',
@@ -23,10 +19,9 @@ interface UiMessage {
 export class ObjectTypesListComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly objectTypeApi = inject(ObjectTypeApi);
+  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
-  private readonly messageSubject = new BehaviorSubject<UiMessage | null>(null);
-  private messageTimeoutHandle: number | null = null;
 
   readonly filterForm = this.fb.group({
     search: ['']
@@ -36,13 +31,13 @@ export class ObjectTypesListComponent implements OnDestroy {
     name: ['', [Validators.required, Validators.maxLength(255)]]
   });
 
-  readonly message$ = this.messageSubject.asObservable();
+  readonly message$ = this.uiMessages.message$;
 
   readonly types$ = this.reload$.pipe(
     switchMap(() =>
       this.objectTypeApi.list().pipe(
         catchError(() => {
-          this.setMessage({ type: 'error', text: 'Не удалось загрузить список типов объектов.' });
+          this.showMessage('error', 'Не удалось загрузить список типов объектов.');
           return of<ObjectType[]>([]);
         })
       )
@@ -79,11 +74,9 @@ export class ObjectTypesListComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
     this.destroy$.next();
     this.destroy$.complete();
+    this.uiMessages.destroy();
   }
 
   refresh(): void {
@@ -153,13 +146,13 @@ export class ObjectTypesListComponent implements OnDestroy {
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: updated => {
-            this.setMessage({ type: 'success', text: `Тип «${updated.name}» обновлён.` });
+            this.showMessage('success', `Тип «${updated.name}» обновлён.`);
             this.refresh();
             this.startCreate();
             this.isProcessing = false;
           },
           error: () => {
-            this.setMessage({ type: 'error', text: 'Не удалось обновить тип объекта.' });
+            this.showMessage('error', 'Не удалось обновить тип объекта.');
             this.isProcessing = false;
           }
         });
@@ -171,13 +164,13 @@ export class ObjectTypesListComponent implements OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: created => {
-          this.setMessage({ type: 'success', text: `Тип «${created.name}» создан.` });
+          this.showMessage('success', `Тип «${created.name}» создан.`);
           this.refresh();
           this.startCreate();
           this.isProcessing = false;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось создать тип объекта.' });
+          this.showMessage('error', 'Не удалось создать тип объекта.');
           this.isProcessing = false;
         }
       });
@@ -198,7 +191,7 @@ export class ObjectTypesListComponent implements OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.setMessage({ type: 'success', text: `Тип «${type.name}» удалён.` });
+          this.showMessage('success', `Тип «${type.name}» удалён.`);
           this.refresh();
           if (this.editingType?.id === type.id) {
             this.cancelEdit();
@@ -206,7 +199,7 @@ export class ObjectTypesListComponent implements OnDestroy {
           this.deletingId = null;
         },
         error: () => {
-          this.setMessage({ type: 'error', text: 'Не удалось удалить тип объекта.' });
+          this.showMessage('error', 'Не удалось удалить тип объекта.');
           this.deletingId = null;
         }
       });
@@ -216,11 +209,7 @@ export class ObjectTypesListComponent implements OnDestroy {
     return item.id;
   }
 
-  private setMessage(message: UiMessage): void {
-    this.messageSubject.next(message);
-    if (this.messageTimeoutHandle !== null) {
-      window.clearTimeout(this.messageTimeoutHandle);
-    }
-    this.messageTimeoutHandle = window.setTimeout(() => this.messageSubject.next(null), 5000);
+  private showMessage(type: UiMessage['type'], text: string): void {
+    this.uiMessages.show({ type, text });
   }
 }

@@ -490,6 +490,12 @@ p {
   border-color: $primary;
 }
 
+.btn-success {
+  background-color: $success;
+  color: #fff;
+  border-color: $success;
+}
+
 .btn-outline-secondary {
   color: $secondary;
   border-color: $secondary;
@@ -514,7 +520,8 @@ p {
 .btn-outline-secondary:hover,
 .btn-outline-warning:hover,
 .btn-outline-danger:hover,
-.btn-primary:hover {
+.btn-primary:hover,
+.btn-success:hover {
   filter: brightness(0.95);
 }
 

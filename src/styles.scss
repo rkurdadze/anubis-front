@@ -22,6 +22,68 @@ body {
   color: rgba(31, 34, 51, 0.65) !important;
 }
 
+/* Layout helpers */
+.section-stack {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.placeholder-card {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.action-buttons {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 0.75rem;
+}
+
+.btn-icon i {
+  font-size: 1.05rem;
+}
+
+.badge {
+  font-weight: 500;
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+.card-header {
+  background-color: #fff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+.list-group-item.active {
+  background-color: rgba(13, 110, 253, 0.1);
+  border-color: rgba(13, 110, 253, 0.2);
+  color: inherit;
+}
+
+.list-group-item.active .badge {
+  background-color: var(--bs-primary);
+  color: #fff;
+}
+
 /* Form controls */
 .form-label {
   font-weight: 600;
