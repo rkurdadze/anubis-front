@@ -33,7 +33,7 @@
   </div>
   <div class="field">
     <label for="role">Роль</label>
-    <select id="role" formControlName="role">
+    <select id="role" formControlName="role" class="form-select">
       <option value="all">Все роли</option>
       <option *ngFor="let role of roles$ | async; trackBy: trackRoleById" [ngValue]="role.id">
         {{ role.name }}
@@ -42,7 +42,7 @@
   </div>
   <div class="field">
     <label for="status">Статус</label>
-    <select id="status" formControlName="status">
+    <select id="status" formControlName="status" class="form-select">
       <option value="all">Все</option>
       <option value="active">Активен</option>
       <option value="inactive">Заблокирован</option>
@@ -154,35 +154,36 @@
       <section class="role-management">
         <h3>Назначенные роли</h3>
         <p class="hint">Отметьте роли, которые должен иметь пользователь.</p>
-        <ul>
-          <li *ngFor="let role of roles$ | async; trackBy: trackRoleById">
-            <label>
-              <input
-                class="form-check-input"
-                #assignedRoleToggle
-                type="checkbox"
-                [checked]="isRoleAssigned(selectedUser, role.id)"
-                (change)="onRoleToggle(role.id, assignedRoleToggle.checked)"
-              />
-              <div class="role-info">
+
+        <div class="role-list">
+          <div class="form-check form-switch role-item"
+               *ngFor="let role of roles$ | async; trackBy: trackRoleById">
+            <input
+              #toggle
+              class="form-check-input"
+              type="checkbox"
+              [id]="'role-' + role.id"
+              [checked]="isRoleAssigned(selectedUser, role.id)"
+              (change)="onRoleToggle(role.id, toggle.checked)"
+            />
+            <label class="form-check-label role-label" [for]="'role-' + role.id">
+              <div class="role-head">
                 <span class="role-name">{{ role.name }}</span>
-                <span class="role-description">{{ role.description }}</span>
-                <span class="role-permissions">
-                  <i class="fa-solid fa-key"></i>
-                  {{ role.permissions.length ? (role.permissions | slice:0:3).join(', ') : 'Без разрешений' }}
-                  <ng-container *ngIf="role.permissions.length > 3">
-                    и ещё {{ role.permissions.length - 3 }}
-                  </ng-container>
-                </span>
                 <span class="role-members">
-                  <i class="fa-solid fa-users"></i>
-                  {{ role.members | number }}
-                  {{ role.members === 1 ? 'пользователь' : 'пользователей' }}
-                </span>
+            <i class="fa-solid fa-users me-1"></i>{{ role.members | number }}
+          </span>
+              </div>
+              <div class="role-desc text-muted small">{{ role.description }}</div>
+              <div class="role-perms text-muted small">
+                <i class="fa-solid fa-key me-1"></i>
+                {{ role.permissions.length ? (role.permissions | slice:0:3).join(', ') : 'Без разрешений' }}
+                <ng-container *ngIf="role.permissions.length > 3">
+                  и ещё {{ role.permissions.length - 3 }}
+                </ng-container>
               </div>
             </label>
-          </li>
-        </ul>
+          </div>
+        </div>
       </section>
     </ng-container>
     <ng-template #noSelection>
@@ -213,7 +214,7 @@
         </label>
         <label>
           <span>Статус</span>
-          <select formControlName="status">
+          <select formControlName="status" class="form-select">
             <option value="active">Активен</option>
             <option value="inactive">Заблокирован</option>
           </select>
@@ -221,16 +222,20 @@
         <fieldset>
           <legend>Роли</legend>
           <div class="role-options">
-            <label *ngFor="let role of roles$ | async; trackBy: trackRoleById">
+            <div class="form-check form-switch role-item"
+                 *ngFor="let role of roles$ | async; trackBy: trackRoleById">
               <input
+                #newToggle
                 class="form-check-input"
-                #newUserRoleToggle
                 type="checkbox"
+                [id]="'new-user-role-' + role.id"
                 [checked]="isRoleSelectedForNewUser(role.id)"
-                (change)="onNewUserRoleToggle(role.id, newUserRoleToggle.checked)"
+                (change)="onNewUserRoleToggle(role.id, newToggle.checked)"
               />
-              {{ role.name }}
-            </label>
+              <label class="form-check-label role-label" [for]="'new-user-role-' + role.id">
+                {{ role.name }}
+              </label>
+            </div>
           </div>
         </fieldset>
         <button type="submit" class="primary">
