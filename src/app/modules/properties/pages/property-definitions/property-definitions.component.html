@@ -5,7 +5,7 @@
       <p class="text-muted mb-0 page-header__description">Определяйте свойства, их типы данных и связи со справочниками</p>
     </div>
     <div class="page-header__actions">
-      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="refresh()">
+      <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
         <i class="fa-solid fa-rotate-right me-1"></i>Обновить
       </button>
       <button
@@ -110,7 +110,7 @@
                 {{ editingProperty ? 'Обновите параметры существующего свойства' : 'Заполните форму для создания нового свойства' }}
               </p>
             </div>
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closePropertyForm()">
+            <button type="button" class="btn btn-outline-secondary" (click)="closePropertyForm()">
               <i class="fa-solid fa-xmark me-1"></i>Скрыть
             </button>
           </div>
@@ -162,15 +162,15 @@
               </div>
               <div class="col-12 col-md-6">
                 <div class="form-check-group">
-                  <div class="form-check">
+                  <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="required" formControlName="isRequired" />
                     <label class="form-check-label" for="required">Обязательное</label>
                   </div>
-                  <div class="form-check">
+                  <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="unique" formControlName="isUnique" />
                     <label class="form-check-label" for="unique">Уникальное</label>
                   </div>
-                  <div class="form-check">
+                  <div class="form-check form-switch">
                     <input
                       class="form-check-input"
                       type="checkbox"

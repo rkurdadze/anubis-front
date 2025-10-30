@@ -158,6 +158,7 @@
           <li *ngFor="let role of roles$ | async; trackBy: trackRoleById">
             <label>
               <input
+                class="form-check-input"
                 #assignedRoleToggle
                 type="checkbox"
                 [checked]="isRoleAssigned(selectedUser, role.id)"
@@ -222,6 +223,7 @@
           <div class="role-options">
             <label *ngFor="let role of roles$ | async; trackBy: trackRoleById">
               <input
+                class="form-check-input"
                 #newUserRoleToggle
                 type="checkbox"
                 [checked]="isRoleSelectedForNewUser(role.id)"

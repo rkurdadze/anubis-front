@@ -18,70 +18,104 @@
   </div>
 
   <ng-container *ngIf="object$ | async as object; else objectLoading">
-    <header class="page-header mb-4">
-      <h1 class="h3 mb-1">Объект #{{ object.id }} — {{ object.name }}</h1>
-      <p class="text-muted mb-0">
-        Тип: {{ getObjectTypeName(object.typeId) }} · Класс: {{ getClassName(object.classId ?? null) }}
-      </p>
-    </header>
+    <ng-container *ngIf="displayedObjectInfo$ | async as displayed">
+      <header class="page-header mb-4">
+        <h1 class="h3 mb-1">Объект #{{ object.id }} — {{ displayed.object?.name || object.name }}</h1>
+        <p class="text-muted mb-0">
+          Тип: {{ getObjectTypeName(displayed.object?.typeId ?? null) }} · Класс: {{ getClassName(displayed.object?.classId ?? null) }}
+        </p>
+      </header>
 
-    <div class="card border-0 anubis-shadow mb-4">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h2 class="h5 mb-0">Основная информация</h2>
-        <span class="badge" [ngClass]="object.isDeleted ? 'bg-secondary' : 'bg-success'">
-          {{ object.isDeleted ? 'Удалён' : 'Активен' }}
-        </span>
+      <div class="card border-0 anubis-shadow mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h2 class="h5 mb-0">Основная информация</h2>
+          <span class="badge" [ngClass]="object.isDeleted ? 'bg-secondary' : 'bg-success'">
+            {{ object.isDeleted ? 'Удалён' : 'Активен' }}
+          </span>
+        </div>
+        <div class="card-body">
+          <ng-container *ngIf="(isLatestVersionSelected$ | async); else versionSnapshotInfo">
+            <form [formGroup]="objectForm" (ngSubmit)="saveObject(object)" class="row g-3">
+              <div class="col-md-6">
+                <label for="object-name" class="form-label">Название</label>
+                <input
+                  id="object-name"
+                  type="text"
+                  class="form-control"
+                  formControlName="name"
+                  [ngClass]="{'is-invalid': objectForm.get('name')?.invalid && (objectForm.get('name')?.dirty || objectForm.get('name')?.touched)}"
+                  autocomplete="off"
+                />
+                <div class="invalid-feedback" *ngIf="objectForm.get('name')?.errors?.['required']">Укажите название объекта.</div>
+                <div class="invalid-feedback" *ngIf="objectForm.get('name')?.errors?.['maxlength']">Название не может превышать 255 символов.</div>
+              </div>
+              <div class="col-md-3">
+                <label for="object-type" class="form-label">Тип</label>
+                <select
+                  id="object-type"
+                  class="form-select"
+                  formControlName="typeId"
+                  [ngClass]="{'is-invalid': objectForm.get('typeId')?.invalid && (objectForm.get('typeId')?.dirty || objectForm.get('typeId')?.touched)}"
+                >
+                  <option [ngValue]="null" disabled>Выберите тип</option>
+                  <option *ngFor="let type of (objectTypes$ | async)" [ngValue]="type.id">{{ type.name }}</option>
+                </select>
+                <div class="invalid-feedback" *ngIf="objectForm.get('typeId')?.errors?.['required']">Необходимо выбрать тип объекта.</div>
+              </div>
+              <div class="col-md-3">
+                <label for="object-class" class="form-label">Класс</label>
+                <select id="object-class" class="form-select" formControlName="classId">
+                  <option [ngValue]="null">Без класса</option>
+                  <option *ngFor="let cls of (availableClasses$ | async)" [ngValue]="cls.id">{{ cls.name }}</option>
+                </select>
+              </div>
+              <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <small class="text-muted">
+                  Создан: <strong *ngIf="object.createdAt; else noDate">{{ object.createdAt | date: 'dd.MM.yyyy HH:mm' }}</strong>
+                  <ng-template #noDate><span class="text-muted">—</span></ng-template>
+                  <span *ngIf="object.createdBy" class="ms-2">Автор: {{ object.createdBy }}</span>
+                </small>
+                <button type="submit" class="btn btn-primary" [disabled]="isSavingObject || objectForm.invalid">
+                  <span *ngIf="isSavingObject" class="spinner-border spinner-border-sm me-1"></span>
+                  <i class="fa-solid fa-floppy-disk me-1"></i>
+                  Сохранить изменения
+                </button>
+              </div>
+            </form>
+          </ng-container>
+          <ng-template #versionSnapshotInfo>
+            <ng-container *ngIf="displayed.versionDetail as versionDetail; else versionSnapshotFallback">
+              <div class="alert alert-info" role="alert">
+                Вы просматриваете данные версии <strong>v{{ versionDetail.versionNum }}</strong> от
+                {{ versionDetail.createdAt | date: 'dd.MM.yyyy HH:mm' }}.
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Название</label>
+                  <p class="form-control-plaintext mb-0">{{ displayed.object?.name || '—' }}</p>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Тип</label>
+                  <p class="form-control-plaintext mb-0">{{ getObjectTypeName(displayed.object?.typeId ?? null) }}</p>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Класс</label>
+                  <p class="form-control-plaintext mb-0">{{ getClassName(displayed.object?.classId ?? null) }}</p>
+                </div>
+                <div class="col-12">
+                  <small class="text-muted">
+                    Автор версии: {{ versionDetail.createdByName || '—' }}
+                    <span *ngIf="versionDetail.comment"> · Комментарий: {{ versionDetail.comment }}</span>
+                  </small>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #versionSnapshotFallback>
+              <p class="text-muted mb-0">Не удалось загрузить данные выбранной версии.</p>
+            </ng-template>
+          </ng-template>
+        </div>
       </div>
-      <div class="card-body">
-        <form [formGroup]="objectForm" (ngSubmit)="saveObject(object)" class="row g-3">
-          <div class="col-md-6">
-            <label for="object-name" class="form-label">Название</label>
-            <input
-              id="object-name"
-              type="text"
-              class="form-control"
-              formControlName="name"
-              [ngClass]="{'is-invalid': objectForm.get('name')?.invalid && (objectForm.get('name')?.dirty || objectForm.get('name')?.touched)}"
-              autocomplete="off"
-            />
-            <div class="invalid-feedback" *ngIf="objectForm.get('name')?.errors?.['required']">Укажите название объекта.</div>
-            <div class="invalid-feedback" *ngIf="objectForm.get('name')?.errors?.['maxlength']">Название не может превышать 255 символов.</div>
-          </div>
-          <div class="col-md-3">
-            <label for="object-type" class="form-label">Тип</label>
-            <select
-              id="object-type"
-              class="form-select"
-              formControlName="typeId"
-              [ngClass]="{'is-invalid': objectForm.get('typeId')?.invalid && (objectForm.get('typeId')?.dirty || objectForm.get('typeId')?.touched)}"
-            >
-              <option [ngValue]="null" disabled>Выберите тип</option>
-              <option *ngFor="let type of (objectTypes$ | async)" [ngValue]="type.id">{{ type.name }}</option>
-            </select>
-            <div class="invalid-feedback" *ngIf="objectForm.get('typeId')?.errors?.['required']">Необходимо выбрать тип объекта.</div>
-          </div>
-          <div class="col-md-3">
-            <label for="object-class" class="form-label">Класс</label>
-            <select id="object-class" class="form-select" formControlName="classId">
-              <option [ngValue]="null">Без класса</option>
-              <option *ngFor="let cls of (availableClasses$ | async)" [ngValue]="cls.id">{{ cls.name }}</option>
-            </select>
-          </div>
-          <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <small class="text-muted">
-              Создан: <strong *ngIf="object.createdAt; else noDate">{{ object.createdAt | date: 'dd.MM.yyyy HH:mm' }}</strong>
-              <ng-template #noDate><span class="text-muted">—</span></ng-template>
-              <span *ngIf="object.createdBy" class="ms-2">Автор: {{ object.createdBy }}</span>
-            </small>
-            <button type="submit" class="btn btn-primary" [disabled]="isSavingObject || objectForm.invalid">
-              <span *ngIf="isSavingObject" class="spinner-border spinner-border-sm me-1"></span>
-              <i class="fa-solid fa-floppy-disk me-1"></i>
-              Сохранить изменения
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
 
     <nav class="nav nav-tabs mb-4">
       <button type="button" class="nav-link" [ngClass]="{active: activeTab === 'properties'}" (click)="setActiveTab('properties')">
@@ -414,6 +448,7 @@
         </div>
       </section>
     </div>
+    </ng-container>
   </ng-container>
 
   <ng-template #objectLoading>

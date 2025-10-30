@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ApiHttpService } from '../services/api-http.service';
-import { ObjectVersion } from '../models/object-version.model';
+import { ObjectVersion, ObjectVersionDetail } from '../models/object-version.model';
 import { ObjectVersionAudit } from '../models/object-version-audit.model';
 
 @Injectable({ providedIn: 'root' })
@@ -21,6 +21,10 @@ export class ObjectVersionApi {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${id}`);
+  }
+
+  get(id: number): Observable<ObjectVersionDetail> {
+    return this.http.get<ObjectVersionDetail>(`${this.baseUrl}/${id}`);
   }
 
   getAudit(versionId: number): Observable<ObjectVersionAudit[]> {

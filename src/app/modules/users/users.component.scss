@@ -259,11 +259,16 @@ tbody tr.is-selected {
 .role-management li label {
   display: grid;
   grid-template-columns: auto 1fr;
+  align-items: center;
   gap: 10px;
   padding: 10px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
+}
+
+.role-management li label .form-check-input {
+  margin: 0;
 }
 
 .role-info {
@@ -338,6 +343,10 @@ legend {
   flex-direction: row;
   align-items: center;
   gap: 6px;
+}
+
+.role-options label .form-check-input {
+  margin: 0;
 }
 
 .error {

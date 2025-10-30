@@ -31,7 +31,7 @@ import { LinkRoleApi } from '../../../../core/api/link-role.api';
 import { RepositoryObject } from '../../../../core/models/object.model';
 import { ObjectType } from '../../../../core/models/object-type.model';
 import { ObjectClass } from '../../../../core/models/class.model';
-import { ObjectVersion } from '../../../../core/models/object-version.model';
+import { ObjectVersion, ObjectVersionDetail } from '../../../../core/models/object-version.model';
 import { PropertyValue } from '../../../../core/models/property-value.model';
 import { PropertyDefinition } from '../../../../core/models/property-def.model';
 import { ObjectFile } from '../../../../core/models/object.model';
@@ -49,6 +49,12 @@ interface UiMessage {
 interface VersionWithAudit {
   version: ObjectVersion | null;
   audit: ObjectVersionAudit[];
+}
+
+interface DisplayedObjectInfo {
+  object: RepositoryObject | null;
+  isVersionSnapshot: boolean;
+  versionDetail: ObjectVersionDetail | null;
 }
 
 type PropertyFormGroup = FormGroup<{
@@ -212,13 +218,26 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
 
   readonly selectedVersionId$ = this.selectedVersionSubject.asObservable();
 
+  readonly selectedVersionDetail$ = combineLatest([this.selectedVersionId$, this.reload$]).pipe(
+    switchMap(([versionId]) => {
+      if (!versionId) {
+        return of<ObjectVersionDetail | null>(null);
+      }
+      return this.objectVersionApi.get(versionId).pipe(
+        catchError(() => {
+          this.setMessage({ type: 'error', text: 'Не удалось загрузить данные версии.' });
+          return of<ObjectVersionDetail | null>(null);
+        })
+      );
+    }),
+    shareReplay(1)
+  );
+
   readonly selectedVersionWithAudit$: Observable<VersionWithAudit> = combineLatest([
-    this.versions$,
-    this.selectedVersionId$,
+    this.selectedVersionDetail$,
     this.auditReload$
   ]).pipe(
-    switchMap(([versions, selectedId]) => {
-      const version = versions.find(item => item.id === selectedId) ?? null;
+    switchMap(([version]) => {
       if (!version) {
         return of<VersionWithAudit>({ version: null, audit: [] });
       }
@@ -229,6 +248,50 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
           return of<VersionWithAudit>({ version, audit: [] });
         })
       );
+    }),
+    shareReplay(1)
+  );
+
+  readonly isLatestVersionSelected$ = combineLatest([this.versions$, this.selectedVersionId$]).pipe(
+    map(([versions, selectedId]) => {
+      if (!versions.length || !selectedId) {
+        return true;
+      }
+      return versions[0]?.id === selectedId;
+    }),
+    startWith(true),
+    shareReplay(1)
+  );
+
+  readonly displayedObjectInfo$: Observable<DisplayedObjectInfo> = combineLatest([
+    this.object$,
+    this.selectedVersionDetail$,
+    this.isLatestVersionSelected$
+  ]).pipe(
+    map(([object, versionDetail, isLatest]): DisplayedObjectInfo => {
+      if (!object) {
+        return { object: null, isVersionSnapshot: false, versionDetail: null };
+      }
+
+      if (!versionDetail || isLatest) {
+        return { object, isVersionSnapshot: false, versionDetail: null };
+      }
+
+      const snapshot = versionDetail.objectSnapshot ?? versionDetail.objectData ?? {};
+      const name = snapshot.name ?? versionDetail.name ?? object.name;
+      const typeId = this.normalizeId(snapshot.typeId ?? versionDetail.typeId) ?? object.typeId;
+      const classId = this.normalizeId(snapshot.classId ?? versionDetail.classId) ?? object.classId ?? null;
+
+      return {
+        object: {
+          ...object,
+          name,
+          typeId,
+          classId
+        },
+        isVersionSnapshot: true,
+        versionDetail
+      };
     }),
     shareReplay(1)
   );
@@ -635,6 +698,14 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       return '—';
     }
     return this.classesCache.find(cls => cls.id === classId)?.name ?? `ID ${classId}`;
+  }
+
+  private normalizeId(value: number | string | null | undefined): number | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const parsed = typeof value === 'string' ? Number.parseInt(value, 10) : value;
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private rebuildPropertiesForm(values: PropertyValue[]): void {
