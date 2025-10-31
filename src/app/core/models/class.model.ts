@@ -23,6 +23,7 @@ export interface ClassPropertyBinding {
   isHidden?: boolean;
   displayOrder?: number;
   isActive: boolean;
+  propertyName: string;
 }
 
 export interface ClassPropertyRequest {

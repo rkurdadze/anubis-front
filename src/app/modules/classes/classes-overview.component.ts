@@ -1,7 +1,7 @@
 import { AsyncPipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
+import {BehaviorSubject, Subject, combineLatest, of, merge, filter} from 'rxjs';
 import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'rxjs/operators';
 
 import { ClassApi } from '../../core/api/class.api';
@@ -32,9 +32,15 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
-  private readonly bindingsReload$ = new BehaviorSubject<void>(undefined);
+  private readonly bindingsReload$ = new BehaviorSubject<number | null>(null);
   private readonly selectedClassId$ = new BehaviorSubject<number | null>(null);
   private currentClassId: number | null = null;
+
+  readonly bindingsReloadTrigger$ = merge(
+    this.selectedClassId$,
+    this.bindingsReload$
+  ).pipe(filter((id): id is number => !!id));
+
 
   readonly filterForm = this.fb.group({
     search: [''],
@@ -118,21 +124,21 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
     map(([classes, selectedId]) => classes.find(cls => cls.id === selectedId) ?? null)
   );
 
-  readonly bindings$ = combineLatest([this.selectedClassId$, this.bindingsReload$]).pipe(
-    switchMap(([classId]) => {
-      if (!classId) {
-        return of<ClassPropertyBinding[]>([]);
-      }
 
-      return this.classApi.listBindings(classId).pipe(
+  readonly bindings$ = this.bindingsReloadTrigger$.pipe(
+    filter((classId): classId is number => typeof classId === 'number' && classId > 0),
+    switchMap(classId =>
+      this.classApi.listBindings(classId).pipe(
         catchError(() => {
           this.showMessage('error', 'Не удалось загрузить привязки свойств.');
           return of<ClassPropertyBinding[]>([]);
         })
-      );
-    }),
+      )
+    ),
     shareReplay(1)
   );
+
+
 
   isSavingClass = false;
   isSavingBinding = false;
@@ -167,7 +173,6 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
 
   selectClass(cls: ObjectClass): void {
     this.selectedClassId$.next(cls.id);
-    this.bindingsReload$.next();
     this.isClassFormOpen = true;
   }
 
@@ -322,7 +327,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
         next: () => {
           this.showMessage('success', 'Привязка свойства создана.');
           this.bindingForm.reset({ propertyDefId: null, isReadonly: false, isHidden: false, displayOrder: 0 });
-          this.bindingsReload$.next();
+          this.bindingsReload$.next(this.currentClassId);
           this.isSavingBinding = false;
         },
         error: () => {
@@ -343,12 +348,12 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
 
     this.deletingBindingId = binding.id;
     this.classApi
-      .deleteBinding(binding.id)
+      .deleteBinding(binding.propertyDefId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.showMessage('success', 'Привязка удалена.');
-          this.bindingsReload$.next();
+          this.bindingsReload$.next(this.currentClassId);
           this.deletingBindingId = null;
         },
         error: () => {
@@ -358,20 +363,26 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
       });
   }
 
-  deactivateBinding(binding: ClassPropertyBinding): void {
-    this.classApi
-      .deactivateBinding(binding.id)
+  toggleBindingActive(binding: ClassPropertyBinding): void {
+    const action$ = binding.isActive
+      ? this.classApi.deactivateBinding(binding.classId, binding.propertyDefId)
+      : this.classApi.activateBinding(binding.classId, binding.propertyDefId);
+
+    action$
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.showMessage('success', 'Привязка деактивирована.');
-          this.bindingsReload$.next();
+          const action = binding.isActive ? 'деактивирована' : 'активирована';
+          this.showMessage('success', `Привязка ${action}.`);
+          this.bindingsReload$.next(this.currentClassId);
         },
         error: () => {
-          this.showMessage('error', 'Не удалось деактивировать привязку.');
+          const action = binding.isActive ? 'деактивировать' : 'активировать';
+          this.showMessage('error', `Не удалось ${action} привязку.`);
         }
       });
   }
+
 
   trackByClassId(_: number, item: ObjectClass): number {
     return item.id;

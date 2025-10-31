@@ -225,8 +225,8 @@
                 <tbody>
                 <tr *ngFor="let binding of bindings$ | async; trackBy: trackByBindingId">
                   <td>
-                    <div class="fw-semibold">#{{ binding.propertyDefId }}</div>
-                    <div class="text-muted small">ID привязки: {{ binding.id }}</div>
+                    <div class="fw-semibold">#{{ binding.propertyName }}</div>
+                    <div class="text-muted small">ID привязки: {{ binding.propertyDefId }}</div>
                   </td>
                   <td>{{ binding.displayOrder ?? '—' }}</td>
                   <td>
@@ -244,12 +244,17 @@
                       </span>
                   </td>
                   <td class="text-end">
-                    <div class="btn-group btn-group-sm">
-                      <button class="btn btn-outline-secondary" type="button" (click)="deactivateBinding(binding)">
-                        <i class="fa-solid fa-ban"></i>
-                        <span class="visually-hidden">Деактивировать</span>
+                    <div class="action-buttons">
+                      <button
+                        class="btn btn-outline-secondary btn-icon"
+                        type="button"
+                        (click)="toggleBindingActive(binding)">
+                        <i class="fa-solid" [ngClass]="binding.isActive ? 'fa-pause' : 'fa-play'"></i>
+                        <span class="visually-hidden">
+                          {{ binding.isActive ? 'Деактивировать' : 'Активировать' }}
+                        </span>
                       </button>
-                      <button class="btn btn-outline-danger" type="button" (click)="deleteBinding(binding)"
+                      <button class="btn btn-outline-danger btn-icon" type="button" (click)="deleteBinding(binding)"
                               [disabled]="deletingBindingId === binding.id">
                         <i class="fa-solid fa-trash"></i>
                         <span class="visually-hidden">Удалить</span>

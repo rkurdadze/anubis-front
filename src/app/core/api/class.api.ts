@@ -48,7 +48,12 @@ export class ClassApi {
     return this.http.delete<void>(`${this.bindingsUrl}/${id}`);
   }
 
-  deactivateBinding(id: number): Observable<void> {
-    return this.http.patch<void>(`${this.bindingsUrl}/${id}/deactivate`);
+  deactivateBinding(classId: number, id: number): Observable<void> {
+    return this.http.patch<void>(`${this.bindingsUrl}/${classId}/${id}/deactivate`);
   }
+
+  activateBinding(classId: number, id: number): Observable<void> {
+    return this.http.patch<void>(`${this.bindingsUrl}/${classId}/${id}/activate`);
+  }
+
 }
