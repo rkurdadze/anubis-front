@@ -1,6 +1,5 @@
 import { AsyncPipe, DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
 import { map, startWith, take } from 'rxjs/operators';
@@ -46,16 +45,7 @@ export class UsersComponent {
     group: this.fb.nonNullable.control<number | 'all'>('all')
   });
 
-  readonly createUserForm = this.fb.nonNullable.group({
-    username: ['', [Validators.required, Validators.maxLength(255)]],
-    fullName: [''],
-    status: this.fb.nonNullable.control<UserStatus>('active', { validators: Validators.required }),
-    password: [''],
-    groupIds: this.fb.nonNullable.control<number[]>([]),
-    roleIds: this.fb.nonNullable.control<number[]>([])
-  });
-
-  readonly editUserForm = this.fb.nonNullable.group({
+  readonly userForm = this.fb.nonNullable.group({
     username: ['', [Validators.required, Validators.maxLength(255)]],
     fullName: [''],
     status: this.fb.nonNullable.control<UserStatus>('active', { validators: Validators.required }),
@@ -68,11 +58,24 @@ export class UsersComponent {
   private readonly groupsSubject = new BehaviorSubject<Group[]>([]);
   private readonly rolesSubject = new BehaviorSubject<Role[]>([]);
   private readonly selectedUserIdSubject = new BehaviorSubject<number | null>(null);
+  private readonly formModeSubject = new BehaviorSubject<'create' | 'edit' | null>(null);
+
+  private editingUserId: number | null = null;
+  private readonly defaultFormValue = {
+    username: '',
+    fullName: '',
+    status: 'active' as UserStatus,
+    password: '',
+    groupIds: [] as number[],
+    roleIds: [] as number[]
+  };
 
   readonly users$ = this.usersSubject.asObservable();
   readonly groups$ = this.groupsSubject.asObservable();
   readonly roles$ = this.rolesSubject.asObservable();
   readonly selectedUserId$ = this.selectedUserIdSubject.asObservable();
+  readonly formMode$ = this.formModeSubject.asObservable();
+  readonly isFormVisible$ = this.formMode$.pipe(map(mode => mode !== null));
 
   readonly filteredUsers$ = combineLatest([
     this.users$,
@@ -111,31 +114,6 @@ export class UsersComponent {
   ];
 
   constructor() {
-    this.selectedUser$
-      .pipe(takeUntilDestroyed())
-      .subscribe(user => {
-        if (!user) {
-          this.editUserForm.reset({
-            username: '',
-            fullName: '',
-            status: 'active',
-            password: '',
-            groupIds: [],
-            roleIds: []
-          });
-          return;
-        }
-
-        this.editUserForm.reset({
-          username: user.username,
-          fullName: user.fullName ?? '',
-          status: user.status,
-          password: '',
-          groupIds: [...user.groupIds],
-          roleIds: [...user.roleIds]
-        });
-      });
-
     this.loadUsers();
     this.loadGroups();
     this.loadRoles();
@@ -157,59 +135,73 @@ export class UsersComponent {
     this.selectedUserIdSubject.next(user.id);
   }
 
+  startCreateUser(): void {
+    this.editingUserId = null;
+    this.userForm.reset(this.defaultFormValue);
+    this.formModeSubject.next('create');
+  }
+
+  startEditUser(user: User): void {
+    this.selectUser(user);
+    this.editingUserId = user.id;
+    this.userForm.reset({
+      username: user.username,
+      fullName: user.fullName ?? '',
+      status: user.status,
+      password: '',
+      groupIds: [...user.groupIds],
+      roleIds: [...user.roleIds]
+    });
+    this.formModeSubject.next('edit');
+  }
+
+  cancelUserForm(): void {
+    this.formModeSubject.next(null);
+    this.editingUserId = null;
+    this.userForm.reset(this.defaultFormValue);
+  }
+
   resetFilters(): void {
     this.filtersForm.reset({ search: '', status: 'all', role: 'all', group: 'all' });
   }
 
-  onCreateUser(): void {
-    if (this.createUserForm.invalid) {
-      this.createUserForm.markAllAsTouched();
+  onSubmitUserForm(): void {
+    if (this.userForm.invalid) {
+      this.userForm.markAllAsTouched();
       return;
     }
 
-    const payload = this.toSaveUserPayload(this.createUserForm.getRawValue());
+    const mode = this.formModeSubject.getValue();
+    const payload = this.toSaveUserPayload(this.userForm.getRawValue());
 
-    if (!payload.username) {
+    if (!payload.username || mode === null) {
       return;
     }
 
-    this.usersApi
-      .create(payload)
-      .pipe(take(1))
-      .subscribe(created => {
-        this.setUsers([...this.usersSubject.getValue(), created]);
-        this.createUserForm.reset({
-          username: '',
-          fullName: '',
-          status: 'active',
-          password: '',
-          groupIds: [],
-          roleIds: []
+    if (mode === 'create') {
+      this.usersApi
+        .create(payload)
+        .pipe(take(1))
+        .subscribe(created => {
+          this.setUsers([...this.usersSubject.getValue(), created]);
+          this.selectedUserIdSubject.next(created.id);
+          this.finishForm();
         });
-        this.selectedUserIdSubject.next(created.id);
-      });
-  }
-
-  onUpdateSelectedUser(): void {
-    const selected = this.selectedUserIdSubject.getValue();
-    if (selected === null) {
       return;
     }
 
-    if (this.editUserForm.invalid) {
-      this.editUserForm.markAllAsTouched();
+    if (this.editingUserId === null) {
       return;
     }
-
-    const payload = this.toSaveUserPayload(this.editUserForm.getRawValue());
 
     this.usersApi
-      .update(selected, payload)
+      .update(this.editingUserId, payload)
       .pipe(take(1))
       .subscribe(updated => {
         const users = this.usersSubject.getValue().map(user => (user.id === updated.id ? updated : user));
         this.setUsers(users);
         this.selectedUserIdSubject.next(updated.id);
+        this.finishForm();
       });
   }
 
@@ -220,6 +212,9 @@ export class UsersComponent {
       .subscribe(() => {
         const updatedUsers = this.usersSubject.getValue().filter(user => user.id !== userId);
         this.setUsers(updatedUsers);
+        if (this.editingUserId === userId) {
+          this.cancelUserForm();
+        }
       });
   }
 
@@ -279,6 +274,10 @@ export class UsersComponent {
     if (selectedId === null && users.length > 0) {
       this.selectedUserIdSubject.next(users[0].id);
     }
+  }
+
+  private finishForm(): void {
+    this.cancelUserForm();
   }
 
   private loadUsers(): void {
