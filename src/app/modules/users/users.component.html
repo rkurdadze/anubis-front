@@ -18,26 +18,31 @@
   </div>
   <div class="metric-card">
     <div class="metric-value">{{ metrics.inactive | number }}</div>
-    <div class="metric-label">Заблокированные</div>
+    <div class="metric-label">Неактивные</div>
   </div>
   <div class="metric-card">
-    <div class="metric-value">{{ metrics.withRecentLogin | number }}</div>
-    <div class="metric-label">Входили за сутки</div>
+    <div class="metric-value">{{ metrics.locked | number }}</div>
+    <div class="metric-label">Заблокированные</div>
   </div>
 </section>
 
 <form class="filters" [formGroup]="filtersForm">
   <div class="field">
     <label for="search">Поиск</label>
-    <input id="search" type="search" formControlName="search" placeholder="Имя или электронная почта" />
+    <input id="search" type="search" formControlName="search" placeholder="Имя или логин" />
   </div>
   <div class="field">
     <label for="role">Роль</label>
     <select id="role" formControlName="role" class="form-select">
       <option value="all">Все роли</option>
-      <option *ngFor="let role of roles$ | async; trackBy: trackRoleById" [ngValue]="role.id">
-        {{ role.name }}
-      </option>
+      <option *ngFor="let role of roles$ | async; trackBy: trackRoleById" [ngValue]="role.id">{{ role.name }}</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="group">Группа</label>
+    <select id="group" formControlName="group" class="form-select">
+      <option value="all">Все группы</option>
+      <option *ngFor="let group of groups$ | async; trackBy: trackGroupById" [ngValue]="group.id">{{ group.name }}</option>
     </select>
   </div>
   <div class="field">
@@ -45,7 +50,8 @@
     <select id="status" formControlName="status" class="form-select">
       <option value="all">Все</option>
       <option value="active">Активен</option>
-      <option value="inactive">Заблокирован</option>
+      <option value="inactive">Неактивен</option>
+      <option value="locked">Заблокирован</option>
     </select>
   </div>
   <div class="actions">
@@ -65,54 +71,68 @@
 
     <ng-container *ngIf="filteredUsers$ | async as users">
       <ng-container *ngIf="roleNameMap$ | async as roleNameMap">
-        <ng-container *ngIf="selectedUserId$ | async as selectedUserId">
-          <div class="table-wrapper" *ngIf="users.length; else emptyUsers">
-            <table>
-              <thead>
-                <tr>
-                  <th>Имя</th>
-                  <th>Email</th>
-                <th>Роли</th>
-                <th>Статус</th>
-                <th>Последний вход</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                *ngFor="let user of users; trackBy: trackUserById"
-                (click)="selectUser(user)"
-                [class.is-selected]="selectedUserId === user.id"
-              >
-                <td>
-                  <span class="user-name">{{ user.name }}</span>
-                </td>
-                <td>{{ user.email }}</td>
-                <td>
-                  <span class="badge" *ngFor="let roleId of user.roles">
-                    {{ roleNameMap.get(roleId) ?? '—' }}
-                  </span>
-                </td>
-                <td>
-                  <span class="status" [ngClass]="user.status">{{ user.status === 'active' ? 'Активен' : 'Заблокирован' }}</span>
-                </td>
-                <td>{{ user.lastLogin | date: 'short' }}</td>
-                <td class="actions">
-                  <button
-                    type="button"
-                    class="icon"
-                    (click)="removeUser(user.id); $event.stopPropagation()"
+        <ng-container *ngIf="groupNameMap$ | async as groupNameMap">
+          <ng-container *ngIf="selectedUserId$ | async as selectedUserId">
+            <div class="table-wrapper" *ngIf="users.length; else emptyUsers">
+      <table>
+        <thead>
+          <tr>
+            <th>Имя</th>
+            <th>Логин</th>
+            <th>Группы</th>
+            <th>Роли</th>
+            <th>Статус</th>
+            <th class="actions-col">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+                  <tr
+                    *ngFor="let user of users; trackBy: trackUserById"
+                    (click)="selectUser(user)"
+                    [class.is-selected]="selectedUserId === user.id"
                   >
-                    <i class="fa-solid fa-user-minus"></i>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          </div>
+                    <td>
+                      <span class="user-name">{{ user.fullName || user.username }}</span>
+                    </td>
+                    <td>{{ user.username }}</td>
+                    <td>
+                      <ng-container *ngIf="user.groupIds.length; else noGroups">
+                        <span class="badge" *ngFor="let groupId of user.groupIds">
+                          {{ groupNameMap.get(groupId) ?? '—' }}
+                        </span>
+                      </ng-container>
+                      <ng-template #noGroups><span class="text-muted small">—</span></ng-template>
+                    </td>
+                    <td>
+                      <ng-container *ngIf="user.roleIds.length; else noRoles">
+                        <span class="badge" *ngFor="let roleId of user.roleIds">
+                          {{ roleNameMap.get(roleId) ?? '—' }}
+                        </span>
+                      </ng-container>
+                      <ng-template #noRoles><span class="text-muted small">—</span></ng-template>
+                    </td>
+                    <td>
+                      <span class="status" [ngClass]="user.status">{{ getStatusLabel(user.status) }}</span>
+                    </td>
+                    <td class="actions">
+                      <button
+                        type="button"
+                        class="table-action"
+                        aria-label="Удалить пользователя"
+                        (click)="removeUser(user.id); $event.stopPropagation()"
+                      >
+                        <i class="fa-solid fa-user-minus"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ng-container>
         </ng-container>
       </ng-container>
     </ng-container>
+
     <ng-template #emptyUsers>
       <div class="empty-state">
         <i class="fa-solid fa-user-group"></i>
@@ -125,67 +145,108 @@
     <ng-container *ngIf="selectedUser$ | async as selectedUser; else noSelection">
       <header>
         <div>
-          <h2>{{ selectedUser.name }}</h2>
-          <p>{{ selectedUser.email }}</p>
+          <h2>{{ selectedUser.fullName || selectedUser.username }}</h2>
+          <p>{{ selectedUser.username }}</p>
         </div>
-        <span class="status" [ngClass]="selectedUser.status">
-          {{ selectedUser.status === 'active' ? 'Активен' : 'Заблокирован' }}
-        </span>
+        <span class="status" [ngClass]="selectedUser.status">{{ getStatusLabel(selectedUser.status) }}</span>
       </header>
 
       <dl class="user-meta">
         <div>
-          <dt>Последний вход</dt>
-          <dd>{{ selectedUser.lastLogin | date: 'medium' }}</dd>
+          <dt>Количество групп</dt>
+          <dd>{{ selectedUser.groupIds.length }}</dd>
         </div>
         <div>
           <dt>Количество ролей</dt>
-          <dd>{{ selectedUser.roles.length }}</dd>
+          <dd>{{ selectedUser.roleIds.length }}</dd>
         </div>
       </dl>
 
-      <div class="toolbar">
-        <button type="button" class="primary" (click)="toggleSelectedUserStatus()">
-          <i class="fa-solid" [ngClass]="selectedUser.status === 'active' ? 'fa-lock' : 'fa-unlock'"></i>
-          {{ selectedUser.status === 'active' ? 'Заблокировать' : 'Разблокировать' }}
-        </button>
-      </div>
-
-      <section class="role-management">
-        <h3>Назначенные роли</h3>
-        <p class="hint">Отметьте роли, которые должен иметь пользователь.</p>
-
-        <div class="role-list">
-          <div class="form-check form-switch role-item"
-               *ngFor="let role of roles$ | async; trackBy: trackRoleById">
-            <input
-              #toggle
-              class="form-check-input"
-              type="checkbox"
-              [id]="'role-' + role.id"
-              [checked]="isRoleAssigned(selectedUser, role.id)"
-              (change)="onRoleToggle(role.id, toggle.checked)"
-            />
-            <label class="form-check-label role-label" [for]="'role-' + role.id">
-              <div class="role-head">
-                <span class="role-name">{{ role.name }}</span>
-                <span class="role-members">
-            <i class="fa-solid fa-users me-1"></i>{{ role.members | number }}
-          </span>
-              </div>
-              <div class="role-desc text-muted small">{{ role.description }}</div>
-              <div class="role-perms text-muted small">
-                <i class="fa-solid fa-key me-1"></i>
-                {{ role.permissions.length ? (role.permissions | slice:0:3).join(', ') : 'Без разрешений' }}
-                <ng-container *ngIf="role.permissions.length > 3">
-                  и ещё {{ role.permissions.length - 3 }}
-                </ng-container>
-              </div>
-            </label>
-          </div>
+      <form class="user-edit-form" [formGroup]="editUserForm" (ngSubmit)="onUpdateSelectedUser()">
+        <div class="user-edit-grid">
+          <label>
+            <span>Логин</span>
+            <input type="text" formControlName="username" />
+          </label>
+          <label>
+            <span>Полное имя</span>
+            <input type="text" formControlName="fullName" />
+          </label>
+          <label>
+            <span>Статус</span>
+            <select formControlName="status" class="form-select">
+              <option *ngFor="let status of statusOptions" [ngValue]="status.value">{{ status.label }}</option>
+            </select>
+          </label>
+          <label>
+            <span>Новый пароль (опционально)</span>
+            <input type="text" formControlName="password" placeholder="Оставьте пустым, чтобы не менять" />
+          </label>
         </div>
-      </section>
+
+        <section class="group-management">
+          <h3 class="section-title">Группы</h3>
+          <p class="section-hint">Отметьте группы, в которых должен состоять пользователь.</p>
+          <div class="stacked-list" *ngIf="groups$ | async as groups; else noGroupsList">
+            <div class="form-check form-switch" *ngFor="let group of groups; trackBy: trackGroupById">
+              <span class="form-check-label">{{ group.name }}</span>
+              <input
+                #groupToggle
+                class="form-check-input"
+                type="checkbox"
+                [checked]="isIdSelected(editUserForm.controls.groupIds, group.id)"
+                (change)="onToggleId(editUserForm.controls.groupIds, group.id, groupToggle.checked)"
+              />
+            </div>
+          </div>
+          <ng-template #noGroupsList>
+            <div class="empty-state">
+              <i class="fa-solid fa-people-group"></i>
+              <p>Группы ещё не созданы.</p>
+            </div>
+          </ng-template>
+        </section>
+
+        <section class="role-management">
+          <h3 class="section-title">Роли</h3>
+          <p class="section-hint">Назначьте роли, необходимые пользователю.</p>
+          <div class="stacked-list" *ngIf="roles$ | async as roles; else noRolesList">
+            <div class="form-check form-switch" *ngFor="let role of roles; trackBy: trackRoleById">
+              <span class="form-check-label">
+                {{ role.name }}
+                <span class="role-desc" *ngIf="role.description">{{ role.description }}</span>
+                <span class="role-desc" *ngIf="role.system">Системная роль</span>
+              </span>
+              <input
+                #roleToggle
+                class="form-check-input"
+                type="checkbox"
+                [checked]="isIdSelected(editUserForm.controls.roleIds, role.id)"
+                (change)="onToggleId(editUserForm.controls.roleIds, role.id, roleToggle.checked)"
+              />
+            </div>
+          </div>
+          <ng-template #noRolesList>
+            <div class="empty-state">
+              <i class="fa-solid fa-key"></i>
+              <p>Роли ещё не созданы.</p>
+            </div>
+          </ng-template>
+        </section>
+
+        <div class="toolbar">
+          <button type="submit" class="primary">
+            <i class="fa-solid fa-floppy-disk"></i>
+            Сохранить изменения
+          </button>
+          <button type="button" class="danger" (click)="removeUser(selectedUser.id)">
+            <i class="fa-solid fa-user-xmark"></i>
+            Удалить пользователя
+          </button>
+        </div>
+      </form>
     </ng-container>
+
     <ng-template #noSelection>
       <div class="empty-state">
         <i class="fa-solid fa-user-check"></i>
@@ -195,81 +256,69 @@
   </section>
 
   <section class="forms panel">
-    <article class="form-card">
-      <h2>Создать пользователя</h2>
-      <form [formGroup]="userForm" (ngSubmit)="onCreateUser()">
+    <h2>Создать пользователя</h2>
+    <form class="create-user-form" [formGroup]="createUserForm" (ngSubmit)="onCreateUser()">
+      <div class="create-user-grid">
         <label>
-          <span>Имя</span>
-          <input type="text" formControlName="name" placeholder="Например, Мария Смирнова" />
-          <small class="error" *ngIf="userForm.get('name')?.invalid && userForm.get('name')?.touched">
-            Минимум 3 символа
-          </small>
+          <span>Логин</span>
+          <input type="text" formControlName="username" placeholder="user@example.com" />
+          <span class="invalid-feedback" *ngIf="createUserForm.controls.username.touched && createUserForm.controls.username.invalid">
+            Укажите логин пользователя
+          </span>
         </label>
         <label>
-          <span>Электронная почта</span>
-          <input type="email" formControlName="email" placeholder="name@example.com" />
-          <small class="error" *ngIf="userForm.get('email')?.invalid && userForm.get('email')?.touched">
-            Укажите корректный email
-          </small>
+          <span>Полное имя</span>
+          <input type="text" formControlName="fullName" placeholder="Например, Мария Смирнова" />
         </label>
         <label>
           <span>Статус</span>
           <select formControlName="status" class="form-select">
-            <option value="active">Активен</option>
-            <option value="inactive">Заблокирован</option>
+            <option *ngFor="let status of statusOptions" [ngValue]="status.value">{{ status.label }}</option>
           </select>
         </label>
+        <label>
+          <span>Пароль (опционально)</span>
+          <input type="text" formControlName="password" placeholder="Можно задать позже" />
+        </label>
+      </div>
+
+      <div class="create-user-lists">
         <fieldset>
-          <legend>Роли</legend>
-          <div class="role-options">
-            <div class="form-check form-switch role-item"
-                 *ngFor="let role of roles$ | async; trackBy: trackRoleById">
+          <legend>Группы</legend>
+          <div class="stacked-list" *ngIf="groups$ | async as groups">
+            <div class="form-check form-switch" *ngFor="let group of groups; trackBy: trackGroupById">
+              <span class="form-check-label">{{ group.name }}</span>
               <input
-                #newToggle
+                #createGroupToggle
                 class="form-check-input"
                 type="checkbox"
-                [id]="'new-user-role-' + role.id"
-                [checked]="isRoleSelectedForNewUser(role.id)"
-                (change)="onNewUserRoleToggle(role.id, newToggle.checked)"
+                [checked]="isIdSelected(createUserForm.controls.groupIds, group.id)"
+                (change)="onToggleId(createUserForm.controls.groupIds, group.id, createGroupToggle.checked)"
               />
-              <label class="form-check-label role-label" [for]="'new-user-role-' + role.id">
-                {{ role.name }}
-              </label>
             </div>
           </div>
         </fieldset>
-        <button type="submit" class="primary">
-          <i class="fa-solid fa-user-plus"></i>
-          Добавить пользователя
-        </button>
-      </form>
-    </article>
+        <fieldset>
+          <legend>Роли</legend>
+          <div class="stacked-list" *ngIf="roles$ | async as roles">
+            <div class="form-check form-switch" *ngFor="let role of roles; trackBy: trackRoleById">
+              <span class="form-check-label">{{ role.name }}</span>
+              <input
+                #createRoleToggle
+                class="form-check-input"
+                type="checkbox"
+                [checked]="isIdSelected(createUserForm.controls.roleIds, role.id)"
+                (change)="onToggleId(createUserForm.controls.roleIds, role.id, createRoleToggle.checked)"
+              />
+            </div>
+          </div>
+        </fieldset>
+      </div>
 
-    <article class="form-card">
-      <h2>Создать роль</h2>
-      <form [formGroup]="roleForm" (ngSubmit)="onCreateRole()">
-        <label>
-          <span>Название</span>
-          <input type="text" formControlName="name" placeholder="Например, Аналитик" />
-          <small class="error" *ngIf="getDuplicateRoleError()">Такая роль уже существует</small>
-        </label>
-        <label>
-          <span>Описание</span>
-          <textarea formControlName="description" rows="3" placeholder="Краткое описание роли"></textarea>
-        </label>
-        <label>
-          <span>Разрешения</span>
-          <input
-            type="text"
-            formControlName="permissions"
-            placeholder="Через запятую, например: Просмотр отчетов, Экспорт"
-          />
-        </label>
-        <button type="submit" class="secondary">
-          <i class="fa-solid fa-key"></i>
-          Добавить роль
-        </button>
-      </form>
-    </article>
+      <button type="submit" class="primary">
+        <i class="fa-solid fa-user-plus"></i>
+        Добавить пользователя
+      </button>
+    </form>
   </section>
 </div>

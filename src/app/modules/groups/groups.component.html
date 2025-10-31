@@ -1,0 +1,244 @@
+<section class="page-header">
+  <div>
+    <h1>Группы безопасности</h1>
+    <p class="subtitle">Формируйте команды пользователей и назначайте им роли доступа.</p>
+  </div>
+</section>
+
+<section class="metrics" *ngIf="metrics$ | async as metrics">
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.total }}</div>
+    <div class="metric-label">Всего групп</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.members }}</div>
+    <div class="metric-label">Уникальных участников</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.roles }}</div>
+    <div class="metric-label">Используемых ролей</div>
+  </div>
+</section>
+
+<form class="filters" [formGroup]="filtersForm">
+  <div class="field">
+    <label for="search">Поиск</label>
+    <input id="search" type="search" formControlName="search" placeholder="Название группы"/>
+  </div>
+  <div class="actions">
+    <button type="button" class="link" (click)="resetFilters()">
+      <i class="fa-solid fa-rotate-left"></i>
+      Сбросить фильтры
+    </button>
+  </div>
+</form>
+
+<div class="content-grid">
+  <section class="groups-list panel">
+    <header>
+      <div>
+        <h2>Список групп</h2>
+        <p>Группы объединяют пользователей и наследуют назначенные роли.</p>
+      </div>
+      <span class="badge">{{ (filteredGroups$ | async)?.length ?? 0 }}</span>
+    </header>
+
+    <div class="table-wrapper" *ngIf="filteredGroups$ | async as groups; else emptyGroups">
+      <table>
+        <thead>
+        <tr>
+          <th>Название</th>
+          <th>Роли</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr
+          *ngFor="let group of groups; trackBy: trackGroupById"
+          (click)="selectGroup(group)"
+          [class.is-selected]="(selectedGroupId$ | async) === group.id"
+        >
+          <td>
+            <div class="group-list-item">
+              <span class="user-name">{{ group.name }}</span>
+              <span class="badge badge-members"
+                    *ngIf="group.memberIds.length; else noMembers">{{ group.memberIds.length }}</span>
+            </div>
+            <ng-template #noMembers>
+              <span class="badge badge-members muted">0</span>
+            </ng-template>
+          </td>
+          <td>
+            <ng-container *ngIf="group.roleIds.length; else noRoles">
+              <ng-container *ngIf="getRoleNamesForGroup(group) as roleNames">
+                <ng-container *ngIf="roleNames.length; else loadingRoles">
+                  <div class="role-tags">
+                    <span class="role-tag" *ngFor="let roleName of roleNames">{{ roleName }}</span>
+                  </div>
+                </ng-container>
+              </ng-container>
+              <ng-template #loadingRoles><span class="text-muted small">Загрузка…</span></ng-template>
+            </ng-container>
+            <ng-template #noRoles><span class="text-muted small">—</span></ng-template>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #emptyGroups>
+      <div class="empty-state">
+        <i class="fa-solid fa-people-group fa-2x"></i>
+        <p>Группы ещё не созданы.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section class="group-details panel">
+    <ng-container *ngIf="selectedGroup$ | async as selected; else noSelection">
+      <header>
+        <div>
+          <h2>{{ selected.name }}</h2>
+<!--          <p class="group-summary">{{ selected.memberIds.length }} участн. • {{ selected.roleIds.length }} ролей</p>-->
+        </div>
+      </header>
+
+      <dl class="group-meta">
+        <div>
+          <dt>Участники</dt>
+          <dd>{{ selected.memberIds.length }}</dd>
+        </div>
+        <div>
+          <dt>Роли</dt>
+          <dd>{{ selected.roleIds.length }}</dd>
+        </div>
+      </dl>
+
+      <form [formGroup]="editGroupForm" (ngSubmit)="onUpdateGroup()">
+        <label>
+          <span>Название</span>
+          <input type="text" formControlName="name"/>
+        </label>
+        <section>
+          <h3 class="section-title">Участники</h3>
+          <p class="section-hint">Отметьте пользователей, которые должны входить в группу.</p>
+          <div class="stacked-list" *ngIf="users$ | async as users; else noUsersList">
+            <div class="form-check form-switch" *ngFor="let user of users; trackBy: trackUserById">
+              <label class="form-check-label">{{ getUserName(user) }}</label>
+              <input
+                #editMemberToggle
+                class="form-check-input"
+                type="checkbox"
+                [checked]="isIdSelected(editGroupForm.controls.memberIds, user.id)"
+                (change)="onToggleId(editGroupForm.controls.memberIds, user.id, editMemberToggle.checked)"
+              />
+            </div>
+          </div>
+          <ng-template #noUsersList>
+            <div class="empty-state">
+              <i class="fa-solid fa-user-slash"></i>
+              <p>Пользователи ещё не загружены.</p>
+            </div>
+          </ng-template>
+        </section>
+
+        <section>
+          <h3 class="section-title">Роли</h3>
+          <p class="section-hint">Назначьте роли, которые будут действовать для всех участников группы.</p>
+          <div class="stacked-list" *ngIf="roles$ | async as roles; else noRolesList">
+            <div class="form-check form-switch" *ngFor="let role of roles; trackBy: trackRoleById">
+              <label class="form-check-label">
+                {{ role.name }}
+                <span class="text-muted small" *ngIf="role.system">(системная)</span>
+              </label>
+              <input
+                #editRoleToggle
+                class="form-check-input"
+                type="checkbox"
+                [checked]="isIdSelected(editGroupForm.controls.roleIds, role.id)"
+                (change)="onToggleId(editGroupForm.controls.roleIds, role.id, editRoleToggle.checked)"
+              />
+            </div>
+          </div>
+          <ng-template #noRolesList>
+            <div class="empty-state">
+              <i class="fa-solid fa-key"></i>
+              <p>Роли ещё не созданы.</p>
+            </div>
+          </ng-template>
+        </section>
+
+        <div class="group-actions">
+          <button type="submit" class="primary">
+            <i class="fa-solid fa-floppy-disk"></i>
+            Сохранить
+          </button>
+          <button type="button" class="danger" (click)="removeGroup(selected.id)">
+            <i class="fa-solid fa-trash-can"></i>
+            Удалить
+          </button>
+        </div>
+      </form>
+    </ng-container>
+
+    <ng-template #noSelection>
+      <div class="empty-state">
+        <i class="fa-solid fa-people-group"></i>
+        <p>Выберите группу слева, чтобы изменить её состав.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section class="forms panel">
+    <h2>Создать группу</h2>
+    <p class="section-hint">Новую группу можно сразу наполнить участниками и ролями.</p>
+    <form class="create-group-form" [formGroup]="createGroupForm" (ngSubmit)="onCreateGroup()">
+      <label>
+        <span>Название</span>
+        <input type="text" formControlName="name" placeholder="Например, Аналитики"/>
+        <span class="invalid-feedback"
+              *ngIf="createGroupForm.get('name')?.touched && createGroupForm.get('name')?.invalid">
+          Укажите название группы
+        </span>
+      </label>
+
+      <div class="create-group-grid">
+        <fieldset>
+          <legend>Участники</legend>
+          <div class="stacked-list" *ngIf="users$ | async as users">
+            <div class="form-check form-switch" *ngFor="let user of users; trackBy: trackUserById">
+              <label class="form-check-label">{{ getUserName(user) }}</label>
+              <input
+                #createMemberToggle
+                class="form-check-input"
+                type="checkbox"
+                [checked]="isIdSelected(createGroupForm.controls.memberIds, user.id)"
+                (change)="onToggleId(createGroupForm.controls.memberIds, user.id, createMemberToggle.checked)"
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Роли</legend>
+          <div class="stacked-list" *ngIf="roles$ | async as roles">
+            <div class="form-check form-switch" *ngFor="let role of roles; trackBy: trackRoleById">
+              <label class="form-check-label">{{ role.name }}</label>
+              <input
+                #createRoleToggle
+                class="form-check-input"
+                type="checkbox"
+                [checked]="isIdSelected(createGroupForm.controls.roleIds, role.id)"
+                (change)="onToggleId(createGroupForm.controls.roleIds, role.id, createRoleToggle.checked)"
+              />
+            </div>
+          </div>
+        </fieldset>
+      </div>
+
+      <button type="submit" class="primary">
+        <i class="fa-solid fa-circle-plus"></i>
+        Создать группу
+      </button>
+    </form>
+  </section>
+</div>

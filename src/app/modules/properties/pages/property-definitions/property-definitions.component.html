@@ -90,9 +90,9 @@
                 </ng-template>
               </td>
               <td class="text-end">
-                <div class="btn-group btn-group-sm">
+                <div class="action-buttons">
                   <button
-                    class="btn btn-outline-secondary"
+                    class="btn btn-outline-secondary btn-icon"
                     type="button"
                     (click)="startEdit(property)"
                   >
@@ -100,7 +100,7 @@
                     <span class="visually-hidden">Редактировать</span>
                   </button>
                   <button
-                    class="btn btn-outline-warning"
+                    class="btn btn-outline-warning btn-icon"
                     type="button"
                     (click)="deactivateProperty(property)"
                     [disabled]="isDeactivatingId === property.id"
@@ -109,7 +109,7 @@
                     <span class="visually-hidden">Деактивировать</span>
                   </button>
                   <button
-                    class="btn btn-outline-danger"
+                    class="btn btn-outline-danger btn-icon"
                     type="button"
                     (click)="deleteProperty(property)"
                     [disabled]="isDeletingId === property.id"

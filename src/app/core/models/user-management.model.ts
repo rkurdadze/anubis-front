@@ -1,31 +1,102 @@
-export type UserStatus = 'active' | 'inactive';
+export type UserStatus = 'active' | 'inactive' | 'locked';
 
-export interface UserRole {
+export type GranteeType = 'user' | 'group' | 'role';
+
+export interface RoleSummary {
   id: number;
   name: string;
-  description: string;
-  permissions: string[];
-  members: number;
+  active: boolean;
 }
 
-export interface User {
+export interface SecurityPrincipal {
+  id: number;
+  type: GranteeType;
+  displayName: string;
+  login: string | null;
+  description: string | null;
+  status: UserStatus | null;
+  groupIds: number[];
+  memberIds: number[];
+  directRoleIds: number[];
+  effectiveRoleIds: number[];
+  directRoles: RoleSummary[];
+  effectiveRoles: RoleSummary[];
+}
+
+export interface AclEntry {
+  id: number;
+  aclId: number;
+  granteeType: GranteeType;
+  granteeId: number;
+  canRead: boolean;
+  canWrite: boolean;
+  canDelete: boolean;
+  canChangeAcl: boolean;
+  principal: SecurityPrincipal | null;
+}
+
+export interface Acl {
   id: number;
   name: string;
-  email: string;
-  status: UserStatus;
-  lastLogin: string | null;
-  roles: number[];
+  description: string | null;
+  entries: AclEntry[];
 }
 
-export interface SaveUserPayload {
+export interface SaveAclPayload {
   name: string;
-  email: string;
-  status: UserStatus;
-  roleIds: number[];
+  description?: string | null;
+}
+
+export interface SaveAclEntryPayload {
+  granteeType: GranteeType;
+  granteeId: number;
+  canRead?: boolean;
+  canWrite?: boolean;
+  canDelete?: boolean;
+  canChangeAcl?: boolean;
+}
+
+export interface Role {
+  id: number;
+  name: string;
+  description: string | null;
+  system: boolean;
+  active: boolean;
 }
 
 export interface SaveRolePayload {
   name: string;
-  description: string;
-  permissions: string[];
+  description?: string | null;
+  active: boolean;
+}
+
+export interface Group {
+  id: number;
+  name: string;
+  memberIds: number[];
+  roleIds: number[];
+}
+
+export interface SaveGroupPayload {
+  name: string;
+  memberIds: number[];
+  roleIds: number[];
+}
+
+export interface User {
+  id: number;
+  username: string;
+  fullName: string | null;
+  status: UserStatus;
+  groupIds: number[];
+  roleIds: number[];
+}
+
+export interface SaveUserPayload {
+  username: string;
+  fullName: string | null;
+  status: UserStatus;
+  groupIds: number[];
+  roleIds: number[];
+  password?: string | null;
 }

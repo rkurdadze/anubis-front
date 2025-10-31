@@ -3,31 +3,24 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import { ApiHttpService } from '../services/api-http.service';
-import { SaveUserPayload, User } from '../models/user-management.model';
+import { SaveUserPayload, User, UserStatus } from '../models/user-management.model';
 
 interface UserDto {
   id: number;
-  name?: string | null;
+  username: string;
   fullName?: string | null;
-  username?: string | null;
-  email?: string | null;
-  status?: string | null;
-  enabled?: boolean | null;
-  active?: boolean | null;
-  lastLogin?: string | null;
-  roles?: number[];
-  roleIds?: number[];
-  groupIds?: number[];
-  groups?: Array<{ id: number } | number>;
+  status?: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | string | null;
+  groupIds?: number[] | null;
+  roleIds?: number[] | null;
 }
 
-interface UserSaveRequest {
-  name: string;
-  email: string;
-  status: string;
-  roleIds: number[];
+interface UserRequest {
+  username?: string;
+  fullName?: string | null;
+  passwordHash?: string | null;
   groupIds?: number[];
-  roles?: number[];
+  roleIds?: number[];
+  status?: string;
   statusCode?: string;
   statusEnum?: string;
 }
@@ -42,15 +35,17 @@ export class UsersApi {
     return this.http.get<UserDto[]>(this.baseUrl).pipe(map(users => users.map(user => this.mapUser(user))));
   }
 
+  get(id: number): Observable<User> {
+    return this.http.get<UserDto>(`${this.baseUrl}/${id}`).pipe(map(user => this.mapUser(user)));
+  }
+
   create(payload: SaveUserPayload): Observable<User> {
-    return this.http
-      .post<UserDto>(this.baseUrl, this.mapSavePayload(payload))
-      .pipe(map(user => this.mapUser(user)));
+    return this.http.post<UserDto>(this.baseUrl, this.mapRequest(payload, true)).pipe(map(user => this.mapUser(user)));
   }
 
   update(id: number, payload: SaveUserPayload): Observable<User> {
     return this.http
-      .put<UserDto>(`${this.baseUrl}/${id}`, this.mapSavePayload(payload))
+      .put<UserDto>(`${this.baseUrl}/${id}`, this.mapRequest(payload, false))
       .pipe(map(user => this.mapUser(user)));
   }
 
@@ -59,68 +54,75 @@ export class UsersApi {
   }
 
   private mapUser(user: UserDto): User {
-    const status = this.mapStatus(user);
-    const name = this.mapName(user);
-
     return {
       id: user.id,
-      name,
-      email: user.email ?? user.username ?? '',
-      status,
-      lastLogin: user.lastLogin ?? null,
-      roles: this.mapRoleIds(user)
+      username: user.username,
+      fullName: user.fullName ?? null,
+      status: this.normalizeStatus(user.status),
+      groupIds: this.toIdArray(user.groupIds),
+      roleIds: this.toIdArray(user.roleIds)
     };
   }
 
-  private mapSavePayload(payload: SaveUserPayload): UserSaveRequest {
-    const normalizedStatus = payload.status === 'active' ? 'ACTIVE' : 'INACTIVE';
-    const roleIds = [...payload.roleIds];
+  private mapRequest(payload: SaveUserPayload, isCreate: boolean): UserRequest {
+    const request: UserRequest = {};
 
-    return {
-      name: payload.name,
-      email: payload.email,
-      status: normalizedStatus,
-      roleIds,
-      // Backend совместимости: передаём дополнительные поля, которые могут ожидаться сервисом безопасности
-      ...(normalizedStatus ? { statusCode: normalizedStatus, statusEnum: normalizedStatus } : {}),
-      groupIds: roleIds,
-      roles: roleIds
-    };
+    if (payload.username !== undefined || isCreate) {
+      request.username = (payload.username ?? '').trim();
+    }
+
+    if (payload.fullName !== undefined) {
+      const trimmed = payload.fullName?.trim();
+      request.fullName = trimmed ? trimmed : null;
+    }
+
+    if (payload.password !== undefined) {
+      request.passwordHash = payload.password ? payload.password : null;
+    }
+
+    if (payload.groupIds !== undefined) {
+      request.groupIds = [...payload.groupIds];
+    }
+
+    if (payload.roleIds !== undefined) {
+      request.roleIds = [...payload.roleIds];
+    }
+
+    if (payload.status !== undefined) {
+      const normalized = this.normalizeStatusForRequest(payload.status);
+      request.status = normalized;
+      request.statusCode = normalized;
+      request.statusEnum = normalized;
+    }
+
+    return request;
   }
 
-  private mapStatus(user: UserDto): 'active' | 'inactive' {
-    const rawStatus =
-      user.status ??
-      (user.enabled ?? user.active ? 'ACTIVE' : 'INACTIVE');
-    const normalized = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : 'inactive';
-    return normalized === 'active' ? 'active' : 'inactive';
+  private toIdArray(value?: number[] | null): number[] {
+    return Array.isArray(value) ? value.filter((id): id is number => typeof id === 'number') : [];
   }
 
-  private mapName(user: UserDto): string {
-    return (
-      user.name ??
-      user.fullName ??
-      user.username ??
-      user.email ??
-      `Пользователь #${user.id}`
-    );
+  private normalizeStatus(status: UserDto['status']): UserStatus {
+    const normalized = typeof status === 'string' ? status.toUpperCase() : 'ACTIVE';
+
+    switch (normalized) {
+      case 'INACTIVE':
+        return 'inactive';
+      case 'LOCKED':
+        return 'locked';
+      default:
+        return 'active';
+    }
   }
 
-  private mapRoleIds(user: UserDto): number[] {
-    if (Array.isArray(user.roles) && user.roles.every(roleId => typeof roleId === 'number')) {
-      return user.roles as number[];
+  private normalizeStatusForRequest(status: UserStatus): 'ACTIVE' | 'INACTIVE' | 'LOCKED' {
+    switch (status) {
+      case 'inactive':
+        return 'INACTIVE';
+      case 'locked':
+        return 'LOCKED';
+      default:
+        return 'ACTIVE';
     }
-    if (Array.isArray(user.roleIds)) {
-      return user.roleIds.filter((id): id is number => typeof id === 'number');
-    }
-    if (Array.isArray(user.groupIds)) {
-      return user.groupIds.filter((id): id is number => typeof id === 'number');
-    }
-    if (Array.isArray(user.groups)) {
-      return user.groups
-        .map(group => (typeof group === 'number' ? group : group?.id))
-        .filter((id): id is number => typeof id === 'number');
-    }
-    return [];
   }
 }

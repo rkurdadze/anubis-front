@@ -1,0 +1,282 @@
+<section class="page-header">
+  <div>
+    <h1>Списки доступа (ACL)</h1>
+    <p class="subtitle">Настраивайте наследуемые правила доступа для пользователей, групп и ролей.</p>
+  </div>
+</section>
+
+<section class="metrics" *ngIf="metrics$ | async as metrics">
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.total }}</div>
+    <div class="metric-label">Всего ACL</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.entries }}</div>
+    <div class="metric-label">Записей доступа</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.principals }}</div>
+    <div class="metric-label">Уникальных субъектов</div>
+  </div>
+</section>
+
+<form class="filters" [formGroup]="filtersForm">
+  <div class="field">
+    <label for="acl-search">Поиск</label>
+    <input id="acl-search" type="search" formControlName="search" placeholder="Название ACL"/>
+  </div>
+  <div class="actions">
+    <button type="button" class="link" (click)="resetFilters()">
+      <i class="fa-solid fa-rotate-left"></i>
+      Сбросить фильтры
+    </button>
+  </div>
+</form>
+
+<div class="content-grid">
+  <section class="acl-list panel">
+    <header>
+      <div>
+        <h2>ACL</h2>
+        <p>Выберите ACL для редактирования записей доступа.</p>
+      </div>
+      <span class="badge">{{ (filteredAcls$ | async)?.length ?? 0 }}</span>
+    </header>
+
+    <div class="table-wrapper" *ngIf="filteredAcls$ | async as acls; else emptyAcls">
+      <table>
+        <thead>
+        <tr>
+          <th>Название</th>
+          <th>Записей</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr
+          *ngFor="let acl of acls; trackBy: trackAclById"
+          (click)="selectAcl(acl)"
+          [class.is-selected]="(selectedAclId$ | async) === acl.id"
+        >
+          <td>
+            <div class="user-name">{{ acl.name }}</div>
+            <div class="acl-description" *ngIf="acl.description; else noDescription">{{ acl.description }}</div>
+            <ng-template #noDescription><span class="text-muted small">Описание не задано</span></ng-template>
+          </td>
+          <td>
+            <span class="badge">{{ acl.entries.length }}</span>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #emptyAcls>
+      <div class="empty-state">
+        <i class="fa-solid fa-shield-halved fa-2x"></i>
+        <p>ACL ещё не созданы.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section class="acl-details panel">
+    <ng-container *ngIf="selectedAcl$ | async as selected; else noAclSelected">
+      <header>
+        <div>
+          <h2>{{ selected.name }}</h2>
+          <p class="acl-description" *ngIf="selected.description">{{ selected.description }}</p>
+        </div>
+      </header>
+
+      <dl class="acl-meta">
+        <div>
+          <dt>Количество записей</dt>
+          <dd>{{ selected.entries.length }}</dd>
+        </div>
+      </dl>
+
+      <form [formGroup]="editAclForm" (ngSubmit)="onUpdateAcl()">
+        <label>
+          <span>Название</span>
+          <input type="text" formControlName="name"/>
+        </label>
+        <label>
+          <span>Описание</span>
+          <textarea rows="3" formControlName="description" placeholder="Краткое описание назначения"></textarea>
+        </label>
+        <div class="permissions">
+          <button type="submit" class="primary">
+            <i class="fa-solid fa-floppy-disk"></i>
+            Сохранить
+          </button>
+          <button type="button" class="danger" (click)="removeAcl(selected.id)">
+            <i class="fa-solid fa-trash-can"></i>
+            Удалить ACL
+          </button>
+        </div>
+      </form>
+
+      <section class="acl-entries">
+        <h3>Записи доступа</h3>
+        <p class="section-hint">Добавьте пользователей, группы или роли и настройте разрешения.</p>
+
+        <form class="entry-form" [formGroup]="entryForm" (ngSubmit)="onAddEntry()">
+          <div class="controls">
+            <label>
+              <span>Тип субъекта</span>
+              <select formControlName="granteeType" class="form-select">
+                <option value="user">Пользователь</option>
+                <option value="group">Группа</option>
+                <option value="role">Роль</option>
+              </select>
+            </label>
+            <label *ngIf="entryTypeControl.value === 'user'">
+              <span>Пользователь</span>
+              <select formControlName="granteeId" class="form-select">
+                <option [ngValue]="null">Выберите пользователя</option>
+                <option *ngFor="let option of userOptions$ | async" [ngValue]="option.id">{{ option.label }}</option>
+              </select>
+            </label>
+            <label *ngIf="entryTypeControl.value === 'group'">
+              <span>Группа</span>
+              <select formControlName="granteeId" class="form-select">
+                <option [ngValue]="null">Выберите группу</option>
+                <option *ngFor="let option of groupOptions$ | async" [ngValue]="option.id">{{ option.label }}</option>
+              </select>
+            </label>
+            <label *ngIf="entryTypeControl.value === 'role'">
+              <span>Роль</span>
+              <select formControlName="granteeId" class="form-select">
+                <option [ngValue]="null">Выберите роль</option>
+                <option *ngFor="let option of roleOptions$ | async" [ngValue]="option.id">{{ option.label }}</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="permissions">
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" formControlName="canRead"/>
+              <span class="form-check-label">Чтение</span>
+            </div>
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" formControlName="canWrite"/>
+              <span class="form-check-label">Запись</span>
+            </div>
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" formControlName="canDelete"/>
+              <span class="form-check-label">Удаление</span>
+            </div>
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" formControlName="canChangeAcl"/>
+              <span class="form-check-label">Управление ACL</span>
+            </div>
+          </div>
+
+          <div>
+            <button type="submit" class="secondary">
+              <i class="fa-solid fa-plus"></i>
+              Добавить запись
+            </button>
+          </div>
+        </form>
+
+        <div class="entries-table" *ngIf="selected.entries.length; else noEntries">
+          <table>
+            <thead>
+            <tr>
+              <th>Субъект</th>
+              <th>Чтение</th>
+              <th>Запись</th>
+              <th>Удаление</th>
+              <th>ACL</th>
+              <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let entry of selected.entries; trackBy: trackEntryById">
+              <td>
+                <div class="principal">
+                  <strong>{{ getPrincipalLabel(entry) }}</strong>
+                  <span class="type">{{ translateGrantee(entry.granteeType) }}</span>
+                  <span class="text-muted small" *ngIf="entry.principal?.status">
+                      Статус: {{ getPrincipalStatus(entry.principal) }}
+                    </span>
+                </div>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  [checked]="entry.canRead"
+                  (change)="togglePermission(entry, 'canRead', $any($event.target).checked)"
+                />
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  [checked]="entry.canWrite"
+                  (change)="togglePermission(entry, 'canWrite', $any($event.target).checked)"
+                />
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  [checked]="entry.canDelete"
+                  (change)="togglePermission(entry, 'canDelete', $any($event.target).checked)"
+                />
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  [checked]="entry.canChangeAcl"
+                  (change)="togglePermission(entry, 'canChangeAcl', $any($event.target).checked)"
+                />
+              </td>
+              <td class="entry-actions">
+                <button type="button" (click)="removeEntry(entry)">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noEntries>
+          <div class="empty-state">
+            <i class="fa-solid fa-lock"></i>
+            <p>Добавьте первую запись доступа.</p>
+          </div>
+        </ng-template>
+      </section>
+    </ng-container>
+
+    <ng-template #noAclSelected>
+      <div class="empty-state">
+        <i class="fa-solid fa-shield"></i>
+        <p>Выберите ACL из списка слева.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section class="forms panel">
+    <h2>Создать ACL</h2>
+    <p class="section-hint">Новая запись доступа позволит повторно использовать права в разных объектах.</p>
+    <form [formGroup]="createAclForm" (ngSubmit)="onCreateAcl()">
+      <label>
+        <span>Название</span>
+        <input type="text" formControlName="name" placeholder="Например, Доступ для отдела продаж"/>
+        <span class="invalid-feedback"
+              *ngIf="createAclForm.get('name')?.touched && createAclForm.get('name')?.invalid">
+          Укажите название ACL
+        </span>
+
+      </label>
+      <label>
+        <span>Описание</span>
+        <textarea rows="4" formControlName="description" placeholder="Кратко опишите сценарий использования"></textarea>
+      </label>
+      <button type="submit" class="secondary">
+        <i class="fa-solid fa-plus"></i>
+        Создать ACL
+      </button>
+    </form>
+  </section>
+</div>

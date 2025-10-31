@@ -28,6 +28,9 @@ export class NavigationComponent {
     { label: 'Справочники', icon: 'fa-solid fa-list-check', route: '/value-lists' },
     { label: 'Представления', icon: 'fa-solid fa-folder-tree', route: '/views' },
     { label: 'Пользователи', icon: 'fa-solid fa-users-gear', route: '/users' },
+    { label: 'Группы', icon: 'fa-solid fa-people-group', route: '/groups' },
+    { label: 'Роли', icon: 'fa-solid fa-user-shield', route: '/roles' },
+    { label: 'ACL', icon: 'fa-solid fa-lock', route: '/acls' },
     { label: 'Поиск', icon: 'fa-solid fa-magnifying-glass', route: '/search' }
   ];
 }

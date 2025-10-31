@@ -47,6 +47,18 @@ export const routes: Routes = [
     loadChildren: () => import('./modules/users/users.routes').then(m => m.USERS_ROUTES)
   },
   {
+    path: 'groups',
+    loadChildren: () => import('./modules/groups/groups.routes').then(m => m.GROUPS_ROUTES)
+  },
+  {
+    path: 'roles',
+    loadChildren: () => import('./modules/roles/roles.routes').then(m => m.ROLES_ROUTES)
+  },
+  {
+    path: 'acls',
+    loadChildren: () => import('./modules/acls/acls.routes').then(m => m.ACLS_ROUTES)
+  },
+  {
     path: 'search',
     loadChildren: () => import('./modules/search/search.routes').then(m => m.SEARCH_ROUTES)
   },

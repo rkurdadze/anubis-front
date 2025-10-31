@@ -1,0 +1,140 @@
+:host {
+  display: block;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1fr;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.acl-entries {
+  margin-top: 20px;
+}
+
+.acl-list header,
+.acl-details header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.acl-list h2,
+.acl-details h2,
+.forms h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.acl-list p,
+.acl-details p,
+.forms p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.acl-description {
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.acl-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.acl-meta div {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.acl-meta dt {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.acl-meta dd {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.entry-form .controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.entry-form .permissions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+
+.entry-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.entry-actions button {
+  border: none;
+  background: none;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.principal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.principal .type {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.forms {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-grid {
+    gap: 16px;
+  }
+}

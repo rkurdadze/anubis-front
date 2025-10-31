@@ -1,12 +1,4 @@
-import {
-  AsyncPipe,
-  DatePipe,
-  DecimalPipe,
-  NgClass,
-  NgFor,
-  NgIf,
-  SlicePipe
-} from '@angular/common';
+import { AsyncPipe, DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -14,66 +6,71 @@ import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
 import { map, startWith, take } from 'rxjs/operators';
 
 import { UsersApi } from '../../core/api/users.api';
-import { UserRolesApi } from '../../core/api/user-roles.api';
-import {
-  SaveRolePayload,
-  SaveUserPayload,
-  User,
-  UserRole,
-  UserStatus
-} from '../../core/models/user-management.model';
+import { GroupsApi } from '../../core/api/groups.api';
+import { RolesApi } from '../../core/api/roles.api';
+import { Group, Role, SaveUserPayload, User, UserStatus } from '../../core/models/user-management.model';
 
 interface FiltersFormValue {
   search: string;
-  role: number | 'all';
   status: UserStatus | 'all';
+  role: number | 'all';
+  group: number | 'all';
 }
 
 interface Metrics {
   total: number;
   active: number;
   inactive: number;
-  withRecentLogin: number;
+  locked: number;
 }
 
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [ReactiveFormsModule, NgFor, NgIf, AsyncPipe, NgClass, DatePipe, DecimalPipe, SlicePipe],
+  imports: [ReactiveFormsModule, NgFor, NgIf, AsyncPipe, NgClass, DecimalPipe],
   templateUrl: './users.component.html',
   styleUrls: ['./users.component.scss'],
+  host: { class: 'security-page' },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UsersComponent {
   private readonly fb = inject(FormBuilder);
+  private readonly usersApi = inject(UsersApi);
+  private readonly groupsApi = inject(GroupsApi);
+  private readonly rolesApi = inject(RolesApi);
 
   readonly filtersForm = this.fb.nonNullable.group({
     search: [''],
+    status: this.fb.nonNullable.control<UserStatus | 'all'>('all'),
     role: this.fb.nonNullable.control<number | 'all'>('all'),
-    status: this.fb.nonNullable.control<UserStatus | 'all'>('all')
+    group: this.fb.nonNullable.control<number | 'all'>('all')
   });
 
-  readonly userForm = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.minLength(3)]],
-    email: ['', [Validators.required, Validators.email]],
+  readonly createUserForm = this.fb.nonNullable.group({
+    username: ['', [Validators.required, Validators.maxLength(255)]],
+    fullName: [''],
     status: this.fb.nonNullable.control<UserStatus>('active', { validators: Validators.required }),
-    roles: this.fb.nonNullable.control<number[]>([])
+    password: [''],
+    groupIds: this.fb.nonNullable.control<number[]>([]),
+    roleIds: this.fb.nonNullable.control<number[]>([])
   });
 
-  readonly roleForm = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.minLength(3)]],
-    description: [''],
-    permissions: ['']
+  readonly editUserForm = this.fb.nonNullable.group({
+    username: ['', [Validators.required, Validators.maxLength(255)]],
+    fullName: [''],
+    status: this.fb.nonNullable.control<UserStatus>('active', { validators: Validators.required }),
+    password: [''],
+    groupIds: this.fb.nonNullable.control<number[]>([]),
+    roleIds: this.fb.nonNullable.control<number[]>([])
   });
-
-  private readonly usersApi = inject(UsersApi);
-  private readonly userRolesApi = inject(UserRolesApi);
 
   private readonly usersSubject = new BehaviorSubject<User[]>([]);
-  private readonly rolesSubject = new BehaviorSubject<UserRole[]>([]);
+  private readonly groupsSubject = new BehaviorSubject<Group[]>([]);
+  private readonly rolesSubject = new BehaviorSubject<Role[]>([]);
   private readonly selectedUserIdSubject = new BehaviorSubject<number | null>(null);
 
   readonly users$ = this.usersSubject.asObservable();
+  readonly groups$ = this.groupsSubject.asObservable();
   readonly roles$ = this.rolesSubject.asObservable();
   readonly selectedUserId$ = this.selectedUserIdSubject.asObservable();
 
@@ -85,46 +82,62 @@ export class UsersComponent {
     )
   ]).pipe(map(([users, filters]) => this.applyFilters(users, filters)));
 
-  readonly selectedUser$ = combineLatest([this.users$, this.selectedUserId$]).pipe(
-    map(([users, selectedId]) => users.find(user => user.id === selectedId) ?? null)
-  );
+  readonly selectedUser$: Observable<User | null> = combineLatest([
+    this.users$,
+    this.selectedUserId$
+  ]).pipe(map(([users, selectedId]) => users.find(user => user.id === selectedId) ?? null));
 
-  readonly metrics$ = this.users$.pipe(
+  readonly metrics$: Observable<Metrics> = this.users$.pipe(
     map(users => ({
       total: users.length,
       active: users.filter(user => user.status === 'active').length,
       inactive: users.filter(user => user.status === 'inactive').length,
-      withRecentLogin: users.filter(user => {
-        if (!user.lastLogin) {
-          return false;
-        }
-
-        return Date.now() - Date.parse(user.lastLogin) < 1000 * 60 * 60 * 24;
-      }).length
+      locked: users.filter(user => user.status === 'locked').length
     }))
+  );
+
+  readonly groupNameMap$ = this.groups$.pipe(
+    map(groups => new Map(groups.map(group => [group.id, group.name] as const)))
   );
 
   readonly roleNameMap$ = this.roles$.pipe(
     map(roles => new Map(roles.map(role => [role.id, role.name] as const)))
   );
 
+  readonly statusOptions: { value: UserStatus; label: string }[] = [
+    { value: 'active', label: 'Активен' },
+    { value: 'inactive', label: 'Неактивен' },
+    { value: 'locked', label: 'Заблокирован' }
+  ];
+
   constructor() {
-    const roleNameControl = this.roleForm.get('name');
-    roleNameControl?.valueChanges
+    this.selectedUser$
       .pipe(takeUntilDestroyed())
-      .subscribe(() => {
-        if (!roleNameControl) {
+      .subscribe(user => {
+        if (!user) {
+          this.editUserForm.reset({
+            username: '',
+            fullName: '',
+            status: 'active',
+            password: '',
+            groupIds: [],
+            roleIds: []
+          });
           return;
         }
 
-        const errors = roleNameControl.errors;
-        if (errors?.['duplicate']) {
-          const { duplicate, ...rest } = errors;
-          roleNameControl.setErrors(Object.keys(rest).length ? rest : null);
-        }
+        this.editUserForm.reset({
+          username: user.username,
+          fullName: user.fullName ?? '',
+          status: user.status,
+          password: '',
+          groupIds: [...user.groupIds],
+          roleIds: [...user.roleIds]
+        });
       });
 
     this.loadUsers();
+    this.loadGroups();
     this.loadRoles();
   }
 
@@ -132,7 +145,11 @@ export class UsersComponent {
     return user.id;
   }
 
-  trackRoleById(_: number, role: UserRole): number {
+  trackGroupById(_: number, group: Group): number {
+    return group.id;
+  }
+
+  trackRoleById(_: number, role: Role): number {
     return role.id;
   }
 
@@ -141,126 +158,58 @@ export class UsersComponent {
   }
 
   resetFilters(): void {
-    this.filtersForm.reset({ search: '', role: 'all', status: 'all' });
-  }
-
-  toggleSelectedUserStatus(): void {
-    const selectedId = this.selectedUserIdSubject.getValue();
-    if (selectedId === null) {
-      return;
-    }
-
-    this.updateUser(selectedId, user => ({
-      ...user,
-      status: user.status === 'active' ? 'inactive' : 'active'
-    }));
-  }
-
-  onRoleToggle(roleId: number, checked: boolean): void {
-    const selectedId = this.selectedUserIdSubject.getValue();
-    if (selectedId === null) {
-      return;
-    }
-
-    this.updateUser(selectedId, user => ({
-      ...user,
-      roles: checked
-        ? this.mergeUnique(user.roles, roleId)
-        : user.roles.filter(id => id !== roleId)
-    }));
-  }
-
-  isRoleAssigned(user: User, roleId: number): boolean {
-    return user.roles.includes(roleId);
+    this.filtersForm.reset({ search: '', status: 'all', role: 'all', group: 'all' });
   }
 
   onCreateUser(): void {
-    if (this.userForm.invalid) {
-      this.userForm.markAllAsTouched();
+    if (this.createUserForm.invalid) {
+      this.createUserForm.markAllAsTouched();
       return;
     }
 
-    const { name, email, status, roles } = this.userForm.getRawValue() as {
-      name: string;
-      email: string;
-      status: UserStatus;
-      roles: number[];
-    };
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
+    const payload = this.toSaveUserPayload(this.createUserForm.getRawValue());
 
-    if (!trimmedName || !trimmedEmail) {
+    if (!payload.username) {
       return;
     }
-
-    const payload: SaveUserPayload = {
-      name: trimmedName,
-      email: trimmedEmail,
-      status,
-      roleIds: [...new Set(roles)]
-    };
 
     this.usersApi
       .create(payload)
       .pipe(take(1))
-      .subscribe(createdUser => {
-        this.setUsers([...this.usersSubject.getValue(), createdUser]);
-        this.userForm.reset({ name: '', email: '', status: 'active', roles: [] });
-        this.selectedUserIdSubject.next(createdUser.id);
-        this.loadRoles();
+      .subscribe(created => {
+        this.setUsers([...this.usersSubject.getValue(), created]);
+        this.createUserForm.reset({
+          username: '',
+          fullName: '',
+          status: 'active',
+          password: '',
+          groupIds: [],
+          roleIds: []
+        });
+        this.selectedUserIdSubject.next(created.id);
       });
   }
 
-  onNewUserRoleToggle(roleId: number, checked: boolean): void {
-    const rolesControl = this.userForm.get('roles') as FormControl<number[]>;
-    const current = rolesControl.getRawValue() ?? [];
-    const updated = checked
-      ? this.mergeUnique(current, roleId)
-      : current.filter(id => id !== roleId);
-    rolesControl.setValue(updated);
-  }
-
-  isRoleSelectedForNewUser(roleId: number): boolean {
-    const rolesControl = this.userForm.get('roles') as FormControl<number[]>;
-    return rolesControl.getRawValue().includes(roleId);
-  }
-
-  onCreateRole(): void {
-    if (this.roleForm.invalid) {
-      this.roleForm.markAllAsTouched();
+  onUpdateSelectedUser(): void {
+    const selected = this.selectedUserIdSubject.getValue();
+    if (selected === null) {
       return;
     }
 
-    const { name, description, permissions } = this.roleForm.getRawValue();
-    const trimmedName = name.trim();
-    if (!trimmedName) {
+    if (this.editUserForm.invalid) {
+      this.editUserForm.markAllAsTouched();
       return;
     }
 
-    const existingRoles = this.rolesSubject.getValue();
-    if (existingRoles.some(role => role.name.toLowerCase() === trimmedName.toLowerCase())) {
-      const control = this.roleForm.get('name');
-      const currentErrors = control?.errors ?? {};
-      control?.setErrors({ ...currentErrors, duplicate: true });
-      control?.markAsTouched();
-      return;
-    }
+    const payload = this.toSaveUserPayload(this.editUserForm.getRawValue());
 
-    const payload: SaveRolePayload = {
-      name: trimmedName,
-      description: (description ?? '').trim(),
-      permissions: (permissions ?? '')
-        .split(',')
-        .map((permission: string) => permission.trim())
-        .filter(Boolean)
-    };
-
-    this.userRolesApi
-      .create(payload)
+    this.usersApi
+      .update(selected, payload)
       .pipe(take(1))
-      .subscribe(createdRole => {
-        this.rolesSubject.next([...existingRoles, createdRole]);
-        this.roleForm.reset({ name: '', description: '', permissions: '' });
+      .subscribe(updated => {
+        const users = this.usersSubject.getValue().map(user => (user.id === updated.id ? updated : user));
+        this.setUsers(users);
+        this.selectedUserIdSubject.next(updated.id);
       });
   }
 
@@ -269,59 +218,50 @@ export class UsersComponent {
       .delete(userId)
       .pipe(take(1))
       .subscribe(() => {
-        const updated = this.usersSubject.getValue().filter(user => user.id !== userId);
-        this.setUsers(updated);
-
-        if (this.selectedUserIdSubject.getValue() === userId) {
-          this.selectedUserIdSubject.next(updated[0]?.id ?? null);
-        }
-
-        this.loadRoles();
+        const updatedUsers = this.usersSubject.getValue().filter(user => user.id !== userId);
+        this.setUsers(updatedUsers);
       });
   }
 
-  getDuplicateRoleError(): boolean {
-    const control = this.roleForm.get('name');
-    return !!control && control.touched && control.hasError('duplicate');
+  isIdSelected(control: FormControl<number[]>, id: number): boolean {
+    return control.value.includes(id);
+  }
+
+  onToggleId(control: FormControl<number[]>, id: number, checked: boolean): void {
+    const current = control.getRawValue();
+    const updated = checked ? this.mergeUnique(current, id) : current.filter(existing => existing !== id);
+    control.setValue(updated);
+  }
+
+  getStatusLabel(status: UserStatus): string {
+    switch (status) {
+      case 'inactive':
+        return 'Неактивен';
+      case 'locked':
+        return 'Заблокирован';
+      default:
+        return 'Активен';
+    }
   }
 
   private applyFilters(users: User[], filters: FiltersFormValue): User[] {
-    const searchTerm = filters.search.toLowerCase().trim();
-    const roleFilter = filters.role;
+    const searchTerm = filters.search.trim().toLowerCase();
     const statusFilter = filters.status;
+    const roleFilter = filters.role;
+    const groupFilter = filters.group;
 
     return users.filter(user => {
       const matchesSearch = searchTerm
-        ? [user.name, user.email].some(field => field.toLowerCase().includes(searchTerm))
+        ? [user.username, user.fullName ?? '']
+            .some(value => value.toLowerCase().includes(searchTerm))
         : true;
 
-      const matchesRole = roleFilter === 'all' ? true : user.roles.includes(roleFilter);
       const matchesStatus = statusFilter === 'all' ? true : user.status === statusFilter;
+      const matchesRole = roleFilter === 'all' ? true : user.roleIds.includes(roleFilter);
+      const matchesGroup = groupFilter === 'all' ? true : user.groupIds.includes(groupFilter);
 
-      return matchesSearch && matchesRole && matchesStatus;
+      return matchesSearch && matchesStatus && matchesRole && matchesGroup;
     });
-  }
-
-  private updateUser(userId: number, update: (user: User) => User): void {
-    const users = this.usersSubject.getValue();
-    const existingUser = users.find(user => user.id === userId);
-
-    if (!existingUser) {
-      return;
-    }
-
-    const updatedUser = update(existingUser);
-    const payload = this.toSaveUserPayload(updatedUser);
-
-    this.usersApi
-      .update(userId, payload)
-      .pipe(take(1))
-      .subscribe(savedUser => {
-        const userToApply = savedUser ?? updatedUser;
-        const updatedUsers = users.map(user => (user.id === userId ? userToApply : user));
-        this.setUsers(updatedUsers);
-        this.loadRoles();
-      });
   }
 
   private mergeUnique(list: number[], item: number): number[] {
@@ -330,15 +270,14 @@ export class UsersComponent {
 
   private setUsers(users: User[]): void {
     this.usersSubject.next(users);
+
     const selectedId = this.selectedUserIdSubject.getValue();
+    if (selectedId !== null && !users.some(user => user.id === selectedId)) {
+      this.selectedUserIdSubject.next(users[0]?.id ?? null);
+    }
 
     if (selectedId === null && users.length > 0) {
       this.selectedUserIdSubject.next(users[0].id);
-      return;
-    }
-
-    if (selectedId !== null && !users.some(user => user.id === selectedId)) {
-      this.selectedUserIdSubject.next(users[0]?.id ?? null);
     }
   }
 
@@ -351,8 +290,17 @@ export class UsersComponent {
       });
   }
 
+  private loadGroups(): void {
+    this.groupsApi
+      .list()
+      .pipe(take(1))
+      .subscribe(groups => {
+        this.groupsSubject.next(groups);
+      });
+  }
+
   private loadRoles(): void {
-    this.userRolesApi
+    this.rolesApi
       .list()
       .pipe(take(1))
       .subscribe(roles => {
@@ -360,12 +308,21 @@ export class UsersComponent {
       });
   }
 
-  private toSaveUserPayload(user: User): SaveUserPayload {
+  private toSaveUserPayload(value: {
+    username?: string;
+    fullName?: string;
+    status?: UserStatus;
+    password?: string;
+    groupIds?: number[];
+    roleIds?: number[];
+  }): SaveUserPayload {
     return {
-      name: user.name,
-      email: user.email,
-      status: user.status,
-      roleIds: [...user.roles]
+      username: (value.username ?? '').trim(),
+      fullName: value.fullName?.trim() ? value.fullName.trim() : null,
+      status: value.status ?? 'active',
+      groupIds: value.groupIds ? [...value.groupIds] : [],
+      roleIds: value.roleIds ? [...value.roleIds] : [],
+      password: value.password?.trim() ? value.password.trim() : null
     };
   }
 }

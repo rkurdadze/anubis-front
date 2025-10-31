@@ -1,0 +1,205 @@
+<section class="page-header">
+  <div>
+    <h1>Роли безопасности</h1>
+    <p class="subtitle">Создавайте именованные роли и управляйте их состоянием и описанием.</p>
+  </div>
+</section>
+
+<section class="metrics" *ngIf="metrics$ | async as metrics">
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.total }}</div>
+    <div class="metric-label">Всего ролей</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.active }}</div>
+    <div class="metric-label">Активные</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value">{{ metrics.inactive }}</div>
+    <div class="metric-label">Выключенные</div>
+  </div>
+</section>
+
+<form class="filters filters--roles" [formGroup]="filtersForm">
+  <div class="field search-field">
+    <label for="role-search">Поиск</label>
+    <div class="search-control">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input
+        id="role-search"
+        type="search"
+        formControlName="search"
+        placeholder="Название роли"
+        autocomplete="off"
+      />
+      <button
+        type="button"
+        class="clear-search"
+        *ngIf="searchControl.value"
+        (click)="clearSearch()"
+        aria-label="Очистить поиск"
+      >
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+    </div>
+    <span class="search-hint">Начните вводить название роли, чтобы сузить список</span>
+  </div>
+  <div class="field form-check form-switch">
+    <label class="form-check">
+      <input class="form-check-input" type="checkbox" formControlName="onlyActive" />
+      <span class="form-check-label">Только активные</span>
+    </label>
+  </div>
+  <div class="actions">
+    <button type="button" class="link" (click)="resetFilters()">
+      <i class="fa-solid fa-rotate-left"></i>
+      Сбросить фильтры
+    </button>
+  </div>
+</form>
+
+<div class="content-grid">
+  <section class="roles-list panel">
+    <header>
+      <div>
+        <h2>Список ролей</h2>
+        <p>Выберите роль из списка для просмотра и редактирования.</p>
+      </div>
+      <span class="badge">{{ (filteredRoles$ | async)?.length ?? 0 }}</span>
+    </header>
+
+    <div class="table-wrapper" *ngIf="filteredRoles$ | async as roles; else emptyRoles">
+      <table>
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Описание</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let role of roles; trackBy: trackRoleById"
+            (click)="selectRole(role)"
+            [class.role-item-row]="true"
+            [class.is-selected]="(selectedRoleId$ | async) === role.id"
+          >
+            <td>
+              <div class="user-name">{{ role.name }}</div>
+              <div class="role-flags">
+                <span class="role-flag system" *ngIf="role.system">Системная</span>
+                <span class="role-flag inactive" *ngIf="!role.active">Отключена</span>
+              </div>
+            </td>
+            <td>
+              <span class="text-muted" *ngIf="!role.description">—</span>
+              <span *ngIf="role.description">{{ role.description }}</span>
+            </td>
+            <td>
+              <span class="status" [ngClass]="role.active ? 'active' : 'inactive'">
+                {{ role.active ? 'Активна' : 'Выключена' }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #emptyRoles>
+      <div class="empty-state">
+        <i class="fa-solid fa-key fa-2x"></i>
+        <p>Роли ещё не созданы.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section class="role-details panel">
+    <ng-container *ngIf="selectedRole$ | async as selected; else noRoleSelected">
+      <header>
+        <div>
+          <h2>{{ selected.name }}</h2>
+          <p class="text-muted" *ngIf="selected.description; else noDescription">{{ selected.description }}</p>
+          <ng-template #noDescription><span class="text-muted">Описание не задано</span></ng-template>
+        </div>
+        <span class="status" [ngClass]="selected.active ? 'active' : 'inactive'">
+          {{ selected.active ? 'Активна' : 'Выключена' }}
+        </span>
+      </header>
+
+      <dl class="role-meta">
+        <div>
+          <dt>Тип</dt>
+          <dd>{{ selected.system ? 'Системная' : 'Пользовательская' }}</dd>
+        </div>
+        <div>
+          <dt>Статус</dt>
+          <dd>{{ selected.active ? 'Активна' : 'Отключена' }}</dd>
+        </div>
+      </dl>
+
+      <form [formGroup]="editRoleForm" (ngSubmit)="onUpdateRole()">
+        <label>
+          <span>Название</span>
+          <input type="text" formControlName="name" [readonly]="selected.system" />
+        </label>
+        <label>
+          <span>Описание</span>
+          <textarea rows="4" formControlName="description" placeholder="Краткое описание роли"></textarea>
+        </label>
+        <div class="form-check form-switch">
+          <input type="checkbox" class="form-check-input" formControlName="active" [disabled]="selected.system" />
+          <span class="form-check-label">Роль активна</span>
+        </div>
+        <div class="role-actions">
+          <button type="submit" class="primary">
+            <i class="fa-solid fa-floppy-disk"></i>
+            Сохранить
+          </button>
+          <button
+            type="button"
+            class="danger"
+            (click)="removeRole(selected.id)"
+            [disabled]="selected.system"
+          >
+            <i class="fa-solid fa-trash-can"></i>
+            Удалить
+          </button>
+        </div>
+      </form>
+    </ng-container>
+
+    <ng-template #noRoleSelected>
+      <div class="empty-state">
+        <i class="fa-solid fa-key"></i>
+        <p>Выберите роль слева, чтобы изменить настройки.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <section class="forms panel">
+    <h2>Создать роль</h2>
+    <p class="section-hint">Задайте название, описание и активность для новой роли.</p>
+    <form [formGroup]="createRoleForm" (ngSubmit)="onCreateRole()">
+      <label>
+        <span>Название</span>
+        <input type="text" formControlName="name" placeholder="Например, Архивариус" />
+        <span class="invalid-feedback"
+              *ngIf="createRoleForm.get('name')?.touched && createRoleForm.get('name')?.invalid">
+          Укажите название роли
+        </span>
+      </label>
+      <label>
+        <span>Описание</span>
+        <textarea rows="4" formControlName="description" placeholder="Кратко опишите назначение роли"></textarea>
+      </label>
+      <div class="form-check form-switch">
+        <input type="checkbox" class="form-check-input" formControlName="active" />
+        <span class="form-check-label">Роль активна</span>
+      </div>
+      <button type="submit" class="secondary">
+        <i class="fa-solid fa-plus"></i>
+        Добавить роль
+      </button>
+    </form>
+  </section>
+</div>
