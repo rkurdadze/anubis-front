@@ -17,7 +17,6 @@ export interface RepositoryObjectRequest {
   name: string;
   typeId: number;
   classId?: number | null;
-  vaultId?: number | null;
   properties?: PropertyValue[];
 }
 

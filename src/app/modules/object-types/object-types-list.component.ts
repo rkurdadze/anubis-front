@@ -2,10 +2,12 @@ import { AsyncPipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
-import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'rxjs/operators';
+import { catchError, map, shareReplay, startWith, switchMap, takeUntil, tap } from 'rxjs/operators';
 
 import { ObjectTypeApi } from '../../core/api/object-type.api';
-import { ObjectType } from '../../core/models/object-type.model';
+import { ObjectType, SaveObjectTypePayload } from '../../core/models/object-type.model';
+import { VaultApi } from '../../core/api/vault.api';
+import { Vault } from '../../core/models/vault.model';
 import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
 
 @Component({
@@ -19,21 +21,49 @@ import { UiMessageService, UiMessage } from '../../shared/services/ui-message.se
 export class ObjectTypesListComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly objectTypeApi = inject(ObjectTypeApi);
+  private readonly vaultApi = inject(VaultApi);
   private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
+  private availableVaults: Vault[] = [];
+
+  private readonly reloadVaults$ = new BehaviorSubject<void>(undefined);
+  private readonly reloadTypes$ = new BehaviorSubject<void>(undefined);
 
   readonly filterForm = this.fb.group({
     search: ['']
   });
 
   readonly typeForm = this.fb.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]]
+    name: ['', [Validators.required, Validators.maxLength(255)]],
+    vaultId: [null as number | null, Validators.required]
   });
 
   readonly message$ = this.uiMessages.message$;
 
-  readonly types$ = this.reload$.pipe(
+  readonly vaults$ = this.reloadVaults$.pipe(
+    switchMap(() =>
+      this.vaultApi.list().pipe(
+        map(vaults => [...vaults].sort((a, b) => a.name.localeCompare(b.name, 'ru'))),
+        tap(vaults => {
+          this.availableVaults = vaults;
+          const control = this.typeForm.get('vaultId');
+          if (!this.editingType && control && (control.value === null || control.value === undefined) && vaults.length > 0) {
+            control.setValue(vaults[0].id);
+          }
+        }),
+        catchError(() => {
+          this.availableVaults = [];
+          this.typeForm.get('vaultId')?.setValue(null);
+          this.showMessage('error', 'Не удалось загрузить список хранилищ.');
+          return of<Vault[]>([]);
+        })
+      )
+    ),
+    shareReplay(1)
+  );
+
+  readonly types$ = this.reloadTypes$.pipe(
     switchMap(() =>
       this.objectTypeApi.list().pipe(
         catchError(() => {
@@ -83,21 +113,34 @@ export class ObjectTypesListComponent implements OnDestroy {
     this.reload$.next();
   }
 
+  refreshTypes(): void {
+    this.reloadTypes$.next();
+  }
+
+  refreshVaults(): void {
+    this.reloadVaults$.next();
+  }
+
+  refreshAll(): void {
+    this.reloadVaults$.next();
+    this.reloadTypes$.next();
+  }
+
   startCreate(): void {
     this.editingType = null;
-    this.typeForm.reset({ name: '' });
+    this.typeForm.reset({ name: '', vaultId: this.getDefaultVaultId() });
     this.isTypeFormOpen = true;
   }
 
   startEdit(type: ObjectType): void {
     this.editingType = type;
-    this.typeForm.reset({ name: type.name });
+    this.typeForm.reset({ name: type.name, vaultId: type.vault?.id ?? null });
     this.isTypeFormOpen = true;
   }
 
   cancelEdit(): void {
     this.editingType = null;
-    this.typeForm.reset({ name: '' });
+    this.typeForm.reset({ name: '', vaultId: this.getDefaultVaultId() });
     this.isTypeFormOpen = false;
   }
 
@@ -136,25 +179,33 @@ export class ObjectTypesListComponent implements OnDestroy {
       return;
     }
 
-    const payload = { name: this.typeForm.value.name!.trim() };
+    const value = this.typeForm.getRawValue();
+    const payload: SaveObjectTypePayload = {
+      name: value.name!.trim(),
+      vaultId: value.vaultId!
+    };
 
     this.isProcessing = true;
+
+    const onSuccess = (msg: string) => {
+      this.showMessage('success', msg);
+      this.refreshTypes(); // ✅ обновляем только список типов
+      this.startCreate();
+      this.isProcessing = false;
+    };
+
+    const onError = (msg: string) => {
+      this.showMessage('error', msg);
+      this.isProcessing = false;
+    };
 
     if (this.editingType) {
       this.objectTypeApi
         .update(this.editingType.id, payload)
         .pipe(takeUntil(this.destroy$))
         .subscribe({
-          next: updated => {
-            this.showMessage('success', `Тип «${updated.name}» обновлён.`);
-            this.refresh();
-            this.startCreate();
-            this.isProcessing = false;
-          },
-          error: () => {
-            this.showMessage('error', 'Не удалось обновить тип объекта.');
-            this.isProcessing = false;
-          }
+          next: updated => onSuccess(`Тип «${updated.name}» обновлён.`),
+          error: () => onError('Не удалось обновить тип объекта.')
         });
       return;
     }
@@ -163,16 +214,8 @@ export class ObjectTypesListComponent implements OnDestroy {
       .create(payload)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: created => {
-          this.showMessage('success', `Тип «${created.name}» создан.`);
-          this.refresh();
-          this.startCreate();
-          this.isProcessing = false;
-        },
-        error: () => {
-          this.showMessage('error', 'Не удалось создать тип объекта.');
-          this.isProcessing = false;
-        }
+        next: created => onSuccess(`Тип «${created.name}» создан.`),
+        error: () => onError('Не удалось создать тип объекта.')
       });
   }
 
@@ -211,5 +254,9 @@ export class ObjectTypesListComponent implements OnDestroy {
 
   private showMessage(type: UiMessage['type'], text: string): void {
     this.uiMessages.show({ type, text });
+  }
+
+  private getDefaultVaultId(): number | null {
+    return this.availableVaults.length > 0 ? this.availableVaults[0].id : null;
   }
 }

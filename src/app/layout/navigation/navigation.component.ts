@@ -19,13 +19,13 @@ interface NavItem {
 export class NavigationComponent {
   readonly items: NavItem[] = [
     { label: 'Панель управления', icon: 'fa-solid fa-gauge-high', route: '/dashboard' },
-    { label: 'Хранилища', icon: 'fa-solid fa-database', route: '/vaults' },
     { label: 'Файловые хранилища', icon: 'fa-solid fa-server', route: '/file-storages' },
-    { label: 'Объекты', icon: 'fa-solid fa-box-archive', route: '/objects' },
+    { label: 'Хранилища', icon: 'fa-solid fa-database', route: '/vaults' },
     { label: 'Типы объектов', icon: 'fa-solid fa-diagram-project', route: '/object-types' },
-    { label: 'Классы', icon: 'fa-solid fa-layer-group', route: '/classes' },
-    { label: 'Свойства', icon: 'fa-solid fa-table-cells-large', route: '/properties' },
     { label: 'Справочники', icon: 'fa-solid fa-list-check', route: '/value-lists' },
+    { label: 'Свойства', icon: 'fa-solid fa-table-cells-large', route: '/properties' },
+    { label: 'Классы', icon: 'fa-solid fa-layer-group', route: '/classes' },
+    { label: 'Объекты', icon: 'fa-solid fa-box-archive', route: '/objects' },
     { label: 'Представления', icon: 'fa-solid fa-folder-tree', route: '/views' },
     { label: 'Пользователи', icon: 'fa-solid fa-users-gear', route: '/users' },
     { label: 'Группы', icon: 'fa-solid fa-people-group', route: '/groups' },

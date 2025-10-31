@@ -45,6 +45,7 @@
               <tr>
                 <th scope="col">ID</th>
                 <th scope="col">Название</th>
+                <th scope="col">Хранилище</th>
                 <th scope="col" class="text-end">Действия</th>
               </tr>
             </thead>
@@ -52,6 +53,10 @@
               <tr *ngFor="let type of filteredTypes$ | async; trackBy: trackById">
                 <td class="text-muted">#{{ type.id }}</td>
                 <td class="fw-semibold">{{ type.name }}</td>
+                <td>
+                  <div class="fw-semibold">{{ type.vault?.name ?? '—' }}</div>
+                  <div class="text-muted small" *ngIf="type.vault?.code">Код: {{ type.vault?.code }}</div>
+                </td>
                 <td class="text-end">
                   <div class="action-buttons">
                     <button type="button" class="btn btn-outline-primary btn-icon" (click)="startEdit(type)">
@@ -71,7 +76,7 @@
                 </td>
               </tr>
               <tr *ngIf="(filteredTypes$ | async)?.length === 0">
-                <td colspan="3" class="text-center text-muted py-4">Типы объектов не найдены.</td>
+                <td colspan="4" class="text-center text-muted py-4">Типы объектов не найдены.</td>
               </tr>
             </tbody>
           </table>
@@ -99,6 +104,24 @@
                 <input type="text" class="form-control" formControlName="name" [class.is-invalid]="typeForm.get('name')?.invalid && typeForm.get('name')?.touched" />
                 <div class="invalid-feedback">Введите название типа.</div>
               </div>
+              <ng-container *ngIf="vaults$ | async as vaults">
+                <div>
+                  <label class="form-label" for="objectTypeVault">Хранилище</label>
+                  <select
+                    id="objectTypeVault"
+                    class="form-select"
+                    formControlName="vaultId"
+                    [class.is-invalid]="typeForm.get('vaultId')?.invalid && typeForm.get('vaultId')?.touched"
+                  >
+                    <option [ngValue]="null" disabled>Выберите хранилище</option>
+                    <option *ngFor="let vault of vaults" [ngValue]="vault.id">{{ vault.name }} ({{ vault.code }})</option>
+                  </select>
+                  <div class="invalid-feedback">Выберите хранилище.</div>
+                  <div class="form-text text-muted" *ngIf="vaults.length === 0">
+                    Создайте хотя бы одно хранилище, чтобы назначить его типу объектов.
+                  </div>
+                </div>
+              </ng-container>
               <div class="d-flex gap-2 flex-wrap">
                 <button type="submit" class="btn btn-primary flex-fill" [disabled]="isProcessing">
                   <i class="fa-solid" [ngClass]="editingType ? 'fa-floppy-disk' : 'fa-plus'"></i>
