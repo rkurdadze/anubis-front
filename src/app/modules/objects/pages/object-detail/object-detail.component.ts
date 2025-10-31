@@ -6,15 +6,23 @@ import {
   OnInit,
   inject
 } from '@angular/core';
-import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormArray,
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators
+} from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { BehaviorSubject, Observable, Subject, combineLatest, of } from 'rxjs';
+import {BehaviorSubject, Observable, Subject, combineLatest, of, delay, filter, pairwise} from 'rxjs';
 import {
   catchError,
   map,
   shareReplay,
   startWith,
-  switchMap,
+  switchMap, take,
   takeUntil,
   tap
 } from 'rxjs/operators';
@@ -72,7 +80,8 @@ type PropertyFormGroup = FormGroup<{
     NgSwitchCase,
     NgSwitchDefault,
     ReactiveFormsModule,
-    RouterLink
+    RouterLink,
+    FormsModule
   ],
   templateUrl: './object-detail.component.html',
   styleUrls: ['./object-detail.component.scss'],
@@ -100,6 +109,11 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly auditReload$ = new BehaviorSubject<void>(undefined);
   private readonly selectedVersionSubject = new BehaviorSubject<number | null>(null);
 
+  expandedVersionId: number | null = null;
+  highlightedVersionId: number | null = null;
+  selectedVersionModel: number | null = null;
+
+
   private propertyDefinitions: PropertyDefinition[] = [];
   private propertyDefinitionMap = new Map<number, PropertyDefinition>();
   private classesCache: ObjectClass[] = [];
@@ -107,7 +121,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
 
   readonly message$ = this.uiMessages.message$;
 
-  readonly objectForm = this.fb.group({
+  protected objectForm = this.fb.group({
     name: this.fb.nonNullable.control('', { validators: [Validators.required, Validators.maxLength(255)] }),
     typeId: this.fb.control<number | null>(null, { validators: [Validators.required] }),
     classId: this.fb.control<number | null>(null)
@@ -148,16 +162,10 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     ),
     tap(object => {
       if (object) {
-        this.objectForm.patchValue(
-          {
-            name: object.name,
-            typeId: object.typeId,
-            classId: object.classId ?? null
-          },
-          { emitEvent: false }
-        );
+        this.initObjectForm(object);
       }
     }),
+
     shareReplay(1)
   );
 
@@ -380,6 +388,9 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   isUploadingFile = false;
   isLinkActionInProgress = false;
 
+  hasChanges = false;
+  private originalObjectData: any;
+
   ngOnInit(): void {
     combineLatest([this.propertyDefinitions$, this.properties$])
       .pipe(takeUntil(this.destroy$))
@@ -391,12 +402,66 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         this.objectForm.get('classId')!.setValue(null);
       });
+
+    this.versions$
+      .pipe(
+        pairwise(),
+        filter(([prev, curr]) => curr.length > prev.length),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(([_, curr]) => {
+        const latest = curr[0];
+        if (latest) {
+          // Выбираем и раскрываем последнюю версию
+          this.selectVersion(latest.id);
+          this.expandedVersionId = latest.id;
+
+          // Подсветка новой версии для визуального фидбека
+          this.highlightedVersionId = latest.id;
+          setTimeout(() => (this.highlightedVersionId = null), 10000);
+
+          // Обновляем журнал аудита
+          this.auditReload$.next();
+
+          // Уведомление пользователю
+          this.showMessage('info', `Автоматически выбрана новая версия v${latest.versionNum}.`);
+        }
+      });
+
+    this.selectedVersionId$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(id => {
+        this.selectedVersionModel = id;
+      });
+
+
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.uiMessages.destroy();
+  }
+
+  initObjectForm(object: any): void {
+    this.objectForm = this.fb.group({
+      name: [object.name || '', [Validators.required, Validators.maxLength(255)]],
+      typeId: [object.typeId || null, Validators.required],
+      classId: [object.classId || null]
+    });
+
+    // Сохраняем оригинальные данные для сравнения
+    this.originalObjectData = this.objectForm.getRawValue();
+
+    // Подписываемся на изменения
+    this.objectForm.valueChanges.subscribe(current => {
+      const changed = (Object.keys(current) as (keyof typeof current)[]).some(key => {
+        const currentValue = current[key];
+        const originalValue = this.originalObjectData[key as keyof typeof this.originalObjectData];
+        return currentValue !== originalValue;
+      });
+      this.hasChanges = changed;
+    });
   }
 
   get propertiesControls(): PropertyFormGroup[] {
@@ -420,19 +485,32 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   }
 
   selectVersion(versionId: number | null, triggerReload = true): void {
-    const currentId = this.selectedVersionSubject.value;
-    const hasChanged = currentId !== versionId;
-
-    if (hasChanged) {
-      this.selectedVersionSubject.next(versionId);
+    if (this.selectedVersionSubject.value === versionId) {
+      return; // 🧠 предотвращаем лишний next()
     }
 
-    if (triggerReload && !hasChanged) {
-      this.propertiesReload$.next();
-      this.filesReload$.next();
-      this.auditReload$.next();
+    this.selectedVersionSubject.next(versionId);
+
+    this.expandedVersionId = versionId;
+
+    if (versionId) {
+      this.highlightedVersionId = versionId;
+      setTimeout(() => (this.highlightedVersionId = null), 3000);
+    }
+
+    if (triggerReload) {
+      // ⚠️ убери эти строки:
+      // this.propertiesReload$.next();
+      // this.filesReload$.next();
+      // this.auditReload$.next();
+
+      // reload$ оставляем — он обновит объект и версии, если нужно
+      this.reload$.next();
     }
   }
+
+
+
 
   saveObject(object: RepositoryObject | null): void {
     if (!object) {
@@ -466,42 +544,66 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   }
 
   addProperty(): void {
-    this.propertiesForm.push(
-      this.fb.group({
-        propertyDefId: this.fb.control<number | null>(null, { validators: [Validators.required] }),
-        value: this.fb.nonNullable.control('')
-      })
+    const propertiesArray = this.propertiesFormGroup.get('properties') as FormArray;
+    const usedIds = propertiesArray.controls
+      .map(ctrl => ctrl.get('propertyDefId')?.value)
+      .filter(v => v !== null);
+
+    const availableDefs = (this.propertyDefinitions$ as Observable<any[]>).pipe(
+      map(defs => defs.filter(d => !usedIds.includes(d.id)))
     );
+
+    availableDefs.subscribe(defs => {
+      if (defs.length === 0) {
+        window.alert('Все свойства уже выбраны.');
+        return;
+      }
+      const group = this.fb.group({
+        propertyDefId: [defs[0].id, Validators.required],
+        value: ['']
+      });
+      propertiesArray.push(group);
+    });
   }
+
+// Добавим helper для проверки, можно ли выбрать конкретное свойство:
+  isPropertyDisabled(defId: number, index: number): boolean {
+    const controls = this.propertiesControls;
+    return controls.some((ctrl, i) => i !== index && ctrl.get('propertyDefId')?.value === defId);
+  }
+
 
   removeProperty(index: number): void {
     this.propertiesForm.removeAt(index);
   }
 
   saveProperties(version: ObjectVersion | null): void {
-    if (!version) {
-      return;
-    }
+    if (!version) return;
     if (this.propertiesForm.invalid) {
       this.propertiesForm.markAllAsTouched();
       return;
     }
+
     const values = this.propertiesForm.controls
-      .map(control => ({
-        propertyDefId: control.get('propertyDefId')!.value!,
-        value: this.parsePropertyValue(control.get('propertyDefId')!.value!, control.get('value')!.value ?? '')
+      .map(ctrl => ({
+        propertyDefId: ctrl.get('propertyDefId')!.value!,
+        value: this.parsePropertyValue(ctrl.get('propertyDefId')!.value!, ctrl.get('value')!.value ?? '')
       }))
-      .filter(item => item.propertyDefId !== null) as PropertyValue[];
+      .filter(v => v.propertyDefId !== null) as PropertyValue[];
+
     this.isSavingProperties = true;
-    this.propertyValueApi
-      .save(version.id, values)
+
+    this.propertyValueApi.save(version.id, values)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.showMessage('success', 'Свойства успешно сохранены.');
           this.isSavingProperties = false;
+
+          // Просто триггерим обновление данных
           this.propertiesReload$.next();
           this.auditReload$.next();
+          this.reload$.next();
         },
         error: () => {
           this.showMessage('error', 'Не удалось сохранить свойства.');
@@ -509,6 +611,20 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         }
       });
   }
+
+
+
+  toggleVersionDetail(versionId: number): void {
+    if (this.expandedVersionId === versionId) {
+      this.expandedVersionId = null;
+      return;
+    }
+    this.expandedVersionId = versionId;
+    this.selectVersion(versionId, false); // не триггерим reload
+  }
+
+
+
 
   resetProperties(): void {
     this.propertiesReload$.next();
@@ -769,4 +885,9 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private showMessage(type: UiMessage['type'], text: string): void {
     this.uiMessages.show({ type, text });
   }
+
+  onVersionDropdownChange(versionId: number | null): void {
+    this.selectVersion(versionId, false);
+  }
+
 }

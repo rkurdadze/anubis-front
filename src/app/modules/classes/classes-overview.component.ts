@@ -348,7 +348,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
 
     this.deletingBindingId = binding.id;
     this.classApi
-      .deleteBinding(binding.propertyDefId)
+      .deleteBinding(binding.classId, binding.propertyDefId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {

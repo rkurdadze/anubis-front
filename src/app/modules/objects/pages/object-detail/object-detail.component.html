@@ -75,11 +75,16 @@
                   <ng-template #noDate><span class="text-muted">—</span></ng-template>
                   <span *ngIf="object.createdBy" class="ms-2">Автор: {{ object.createdBy }}</span>
                 </small>
-                <button type="submit" class="btn btn-primary" [disabled]="isSavingObject || objectForm.invalid">
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [disabled]="isSavingObject || objectForm.invalid || !hasChanges"
+                >
                   <span *ngIf="isSavingObject" class="spinner-border spinner-border-sm me-1"></span>
                   <i class="fa-solid fa-floppy-disk me-1"></i>
                   Сохранить изменения
                 </button>
+
               </div>
             </form>
           </ng-container>
@@ -138,12 +143,17 @@
           <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-3">
             <div class="d-flex flex-wrap gap-3 align-items-center">
               <label class="form-label mb-0" for="version-select">Версия</label>
-              <select id="version-select" class="form-select" [value]="versionInfo.version?.id ?? ''" (change)="selectVersion($any($event.target).value ? +$any($event.target).value : null)">
+              <select
+                id="version-select"
+                class="form-select"
+                [(ngModel)]="selectedVersionModel"
+                (ngModelChange)="onVersionDropdownChange($event)">
                 <option value="" disabled>Выберите версию</option>
-                <option *ngFor="let version of (versions$ | async); trackBy: trackByVersionId" [value]="version.id">
+                <option *ngFor="let version of (versions$ | async); trackBy: trackByVersionId" [ngValue]="version.id">
                   v{{ version.versionNum }} — {{ version.createdAt | date: 'dd.MM.yyyy HH:mm' }}
                 </option>
               </select>
+
             </div>
             <div class="d-flex gap-2">
               <button type="button" class="btn btn-outline-secondary" (click)="resetProperties()">
@@ -177,8 +187,14 @@
                         <label class="form-label">Свойство</label>
                         <select class="form-select" formControlName="propertyDefId">
                           <option [ngValue]="null" disabled>Выберите свойство</option>
-                          <option *ngFor="let def of (propertyDefinitions$ | async); trackBy: trackById" [ngValue]="def.id">{{ def.name }}</option>
+                          <option
+                            *ngFor="let def of (propertyDefinitions$ | async); trackBy: trackById"
+                            [ngValue]="def.id"
+                            [disabled]="isPropertyDisabled(def.id, i)">
+                            {{ def.name }}
+                          </option>
                         </select>
+
                       </div>
                       <div class="col-md-7">
                         <label class="form-label">Значение</label>
@@ -225,72 +241,88 @@
             <div class="table-responsive">
               <table class="table table-hover align-middle mb-0">
                 <thead>
-                  <tr>
-                    <th scope="col">Версия</th>
-                    <th scope="col">Комментарий</th>
-                    <th scope="col">Создана</th>
-                    <th scope="col">Автор</th>
-                  </tr>
+                <tr>
+                  <th scope="col">Версия</th>
+                  <th scope="col">Комментарий</th>
+                  <th scope="col">Создана</th>
+                  <th scope="col">Автор</th>
+                </tr>
                 </thead>
+
                 <tbody *ngIf="versions$ | async as versions">
-                  <ng-container *ngIf="versions.length; else emptyVersions">
-                    <ng-container *ngIf="selectedVersionId$ | async as selectedVersionId">
+                <ng-container *ngIf="versions.length; else emptyVersions">
+                  <ng-container *ngIf="selectedVersionWithAudit$ | async as versionInfo">
+                    <ng-container *ngFor="let version of versions; trackBy: trackByVersionId">
                       <tr
-                        *ngFor="let version of versions; trackBy: trackByVersionId"
-                        (click)="selectVersion(version.id)"
-                        [ngClass]="{'table-active': selectedVersionId === version.id}"
+                        (click)="toggleVersionDetail(version.id)"
+                        [ngClass]="{
+            'table-active': expandedVersionId === version.id,
+            'highlight-row': highlightedVersionId === version.id
+          }"
+                        class="cursor-pointer"
                       >
                         <td class="fw-semibold">v{{ version.versionNum }}</td>
                         <td>{{ version.comment || '—' }}</td>
                         <td>{{ version.createdAt | date: 'dd.MM.yyyy HH:mm' }}</td>
                         <td>{{ version.createdByName || '—' }}</td>
                       </tr>
+
+                      <tr *ngIf="expandedVersionId === version.id">
+                        <td colspan="4" class="p-0">
+                          <div class="version-detail p-3 border-top">
+                            <h6 class="fw-semibold mb-2">
+                              Журнал изменений для версии v{{ version.versionNum }}
+                            </h6>
+
+                            <ng-container *ngIf="versionInfo.version?.id === version.id; else loadingAudit">
+                              <ng-container *ngIf="versionInfo.audit.length; else noAudit">
+                                <ul class="list-group list-group-flush">
+                                  <li
+                                    *ngFor="let entry of versionInfo.audit; trackBy: trackById"
+                                    class="list-group-item small"
+                                  >
+                                    <div class="d-flex justify-content-between">
+                                      <span class="fw-semibold">{{ entry.changeType }}</span>
+                                      <span class="text-muted">{{ entry.modifiedAt | date: 'dd.MM.yyyy HH:mm' }}</span>
+                                    </div>
+                                    <div class="text-muted">{{ entry.changeSummary || 'Без описания' }}</div>
+                                    <div *ngIf="entry.fieldChanged" class="text-muted">
+                                      Поле: {{ entry.fieldChanged }} · {{ entry.oldValue || '—' }} → {{ entry.newValue || '—' }}
+                                    </div>
+                                  </li>
+                                </ul>
+                              </ng-container>
+                              <ng-template #noAudit>
+                                <p class="text-muted mb-0">Для этой версии нет записей аудита.</p>
+                              </ng-template>
+                            </ng-container>
+
+                            <ng-template #loadingAudit>
+                              <div class="text-muted small py-2">Загрузка данных аудита...</div>
+                            </ng-template>
+                          </div>
+                        </td>
+                      </tr>
                     </ng-container>
                   </ng-container>
-                  <ng-template #emptyVersions>
-                    <tr>
-                      <td colspan="4" class="text-center text-muted py-4">Версии не найдены.</td>
-                    </tr>
-                  </ng-template>
+                </ng-container>
+
+                <ng-template #emptyVersions>
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-4">
+                      Версии не найдены.
+                    </td>
+                  </tr>
+                </ng-template>
                 </tbody>
+
               </table>
+
             </div>
           </div>
         </div>
 
-        <div class="card border-0 anubis-shadow mt-4" *ngIf="selectedVersionWithAudit$ | async as versionInfo">
-          <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h3 class="h6 mb-0">Журнал изменений версии</h3>
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refreshAudit()">
-              <i class="fa-solid fa-rotate-right me-1"></i>
-              Обновить
-            </button>
-          </div>
-          <div class="card-body">
-            <p class="text-muted" *ngIf="!versionInfo.version">Выберите версию, чтобы увидеть историю изменений.</p>
-            <ng-container *ngIf="versionInfo.version">
-              <h4 class="h6">Версия v{{ versionInfo.version.versionNum }}</h4>
-              <p class="text-muted">Создана {{ versionInfo.version.createdAt | date: 'dd.MM.yyyy HH:mm' }} пользователем {{ versionInfo.version.createdByName || '—' }}</p>
-              <div *ngIf="versionInfo.audit.length; else noAudit">
-                <ul class="list-group list-group-flush">
-                  <li *ngFor="let entry of versionInfo.audit; trackBy: trackById" class="list-group-item">
-                    <div class="d-flex justify-content-between">
-                      <span class="fw-semibold">{{ entry.changeType }}</span>
-                      <span class="text-muted">{{ entry.modifiedAt | date: 'dd.MM.yyyy HH:mm' }}</span>
-                    </div>
-                    <div class="text-muted small">{{ entry.changeSummary || 'Без описания' }}</div>
-                    <div *ngIf="entry.fieldChanged" class="small mt-1">
-                      Поле: {{ entry.fieldChanged }} · {{ entry.oldValue || '—' }} → {{ entry.newValue || '—' }}
-                    </div>
-                  </li>
-                </ul>
-              </div>
-              <ng-template #noAudit>
-                <p class="text-muted mb-0">Для выбранной версии нет записей аудита.</p>
-              </ng-template>
-            </ng-container>
-          </div>
-        </div>
+
       </section>
 
       <section *ngSwitchCase="'files'">

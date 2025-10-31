@@ -44,8 +44,8 @@ export class ClassApi {
     return this.http.put<ClassPropertyBinding>(`${this.bindingsUrl}/${id}`, payload);
   }
 
-  deleteBinding(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.bindingsUrl}/${id}`);
+  deleteBinding(classId: number, id: number): Observable<void> {
+    return this.http.delete<void>(`${this.bindingsUrl}/${classId}/${id}`);
   }
 
   deactivateBinding(classId: number, id: number): Observable<void> {
