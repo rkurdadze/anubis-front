@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { ValueListsOverviewComponent } from './pages/value-lists-overview/value-lists-overview.component';
+import { ValueListsOverviewComponent } from './value-lists-overview.component';
 
 export const VALUE_LISTS_ROUTES: Routes = [
   {

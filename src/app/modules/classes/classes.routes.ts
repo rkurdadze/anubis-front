@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { ClassesOverviewComponent } from './pages/classes-overview/classes-overview.component';
+import { ClassesOverviewComponent } from './classes-overview.component';
 
 export const CLASSES_ROUTES: Routes = [
   {

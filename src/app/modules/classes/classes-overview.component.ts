@@ -4,17 +4,17 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
 import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'rxjs/operators';
 
-import { ClassApi } from '../../../../core/api/class.api';
-import { ObjectTypeApi } from '../../../../core/api/object-type.api';
-import { PropertyDefinitionApi } from '../../../../core/api/property-def.api';
+import { ClassApi } from '../../core/api/class.api';
+import { ObjectTypeApi } from '../../core/api/object-type.api';
+import { PropertyDefinitionApi } from '../../core/api/property-def.api';
 import {
   ClassPropertyBinding,
   ObjectClass,
   ObjectClassRequest
-} from '../../../../core/models/class.model';
-import { ObjectType } from '../../../../core/models/object-type.model';
-import { PropertyDefinition } from '../../../../core/models/property-def.model';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+} from '../../core/models/class.model';
+import { ObjectType } from '../../core/models/object-type.model';
+import { PropertyDefinition } from '../../core/models/property-def.model';
+import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-classes-overview',

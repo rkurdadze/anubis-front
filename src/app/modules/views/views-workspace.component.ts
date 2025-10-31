@@ -4,11 +4,11 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, of } from 'rxjs';
 import { catchError, takeUntil } from 'rxjs/operators';
 
-import { ObjectViewApi } from '../../../../core/api/view.api';
-import { ObjectView } from '../../../../core/models/object-view.model';
-import { RepositoryObject } from '../../../../core/models/object.model';
-import { ObjectVersion } from '../../../../core/models/object-version.model';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { ObjectViewApi } from '../../core/api/view.api';
+import { ObjectView } from '../../core/models/object-view.model';
+import { RepositoryObject } from '../../core/models/object.model';
+import { ObjectVersion } from '../../core/models/object-version.model';
+import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-views-workspace',

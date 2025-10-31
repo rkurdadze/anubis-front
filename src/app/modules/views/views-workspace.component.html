@@ -14,10 +14,10 @@
           <span class="input-group-text">Пользователь</span>
           <input type="number" class="form-control" formControlName="userId" />
         </div>
-        <button type="submit" class="btn btn-outline-primary btn-sm">
+        <button type="submit" class="btn btn-outline-primary">
           <i class="fa-solid fa-rotate-right me-1"></i>Обновить
         </button>
-        <button type="button" class="btn-sm" [ngClass]="viewPrimaryButtonClasses" (click)="handleViewPrimaryAction()">
+        <button type="button" class="btn" [ngClass]="viewPrimaryButtonClasses" (click)="handleViewPrimaryAction()">
           <i class="fa-fw" [ngClass]="viewPrimaryButtonIcon"></i>
           <span class="ms-1">{{ viewPrimaryButtonLabel }}</span>
         </button>

@@ -5,12 +5,12 @@
       <p class="text-muted mb-0 page-header__description">Структурируйте значения для свойств и управляйте иерархиями списков</p>
     </div>
     <div class="page-header__actions">
-      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="refresh()">
+      <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
         <i class="fa-solid fa-rotate-right me-1"></i>Обновить
       </button>
       <button
         type="button"
-        class="btn-sm"
+        class="btn"
         [ngClass]="listPrimaryButtonClasses"
         (click)="handleListPrimaryAction()"
       >

@@ -4,8 +4,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, takeUntil, tap } from 'rxjs/operators';
 
-import { SearchApi } from '../../../../core/api/search.api';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { SearchApi } from '../../core/api/search.api';
+import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-search-center',

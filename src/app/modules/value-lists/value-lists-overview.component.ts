@@ -4,9 +4,9 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
 import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'rxjs/operators';
 
-import { ValueListApi } from '../../../../core/api/value-list.api';
-import { ValueList, ValueListItem } from '../../../../core/models/value-list.model';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { ValueListApi } from '../../core/api/value-list.api';
+import { ValueList, ValueListItem } from '../../core/models/value-list.model';
+import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-value-lists-overview',

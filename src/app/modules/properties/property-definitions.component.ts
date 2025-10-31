@@ -4,14 +4,14 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
 import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'rxjs/operators';
 
-import { PropertyDefinitionApi } from '../../../../core/api/property-def.api';
-import { ObjectTypeApi } from '../../../../core/api/object-type.api';
-import { ValueListApi } from '../../../../core/api/value-list.api';
-import { PropertyDefinition, PropertyDefinitionRequest } from '../../../../core/models/property-def.model';
-import { ObjectType } from '../../../../core/models/object-type.model';
-import { ValueList } from '../../../../core/models/value-list.model';
-import { PropertyDataType } from '../../../../core/models/property-data-type.enum';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { PropertyDefinitionApi } from '../../core/api/property-def.api';
+import { ObjectTypeApi } from '../../core/api/object-type.api';
+import { ValueListApi } from '../../core/api/value-list.api';
+import { PropertyDefinition, PropertyDefinitionRequest } from '../../core/models/property-def.model';
+import { ObjectType } from '../../core/models/object-type.model';
+import { ValueList } from '../../core/models/value-list.model';
+import { PropertyDataType } from '../../core/models/property-data-type.enum';
+import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-property-definitions',

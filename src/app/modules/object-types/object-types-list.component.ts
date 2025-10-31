@@ -4,9 +4,9 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
 import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'rxjs/operators';
 
-import { ObjectTypeApi } from '../../../../core/api/object-type.api';
-import { ObjectType } from '../../../../core/models/object-type.model';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { ObjectTypeApi } from '../../core/api/object-type.api';
+import { ObjectType } from '../../core/models/object-type.model';
+import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
 
 @Component({
   selector: 'app-object-types-list',
