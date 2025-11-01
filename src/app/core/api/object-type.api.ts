@@ -21,7 +21,7 @@ export class ObjectTypeApi {
               name: dto.vaultName ?? '',
               code: '', // безопасное значение по умолчанию
               description: '',
-              isActive: true,
+              isActive: dto.vaultActive,
               defaultStorage: null
             }
             : null
@@ -41,7 +41,7 @@ export class ObjectTypeApi {
             name: dto.vaultName ?? '',
             code: '',
             description: '',
-            isActive: true,
+            isActive: dto.vaultActive,
             defaultStorage: null
           }
           : null
@@ -60,7 +60,7 @@ export class ObjectTypeApi {
             name: dto.vaultName ?? '',
             code: '',
             description: '',
-            isActive: true,
+            isActive: dto.vaultActive,
             defaultStorage: null
           }
           : null
@@ -79,7 +79,7 @@ export class ObjectTypeApi {
             name: dto.vaultName ?? '',
             code: '',
             description: '',
-            isActive: true,
+            isActive: dto.vaultActive,
             defaultStorage: null
           }
           : null

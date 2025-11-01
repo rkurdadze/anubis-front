@@ -889,5 +889,28 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   onVersionDropdownChange(versionId: number | null): void {
     this.selectVersion(versionId, false);
   }
+  /**
+   * Проверяет, можно ли загружать файлы:
+   * - выбран тип объекта
+   * - у типа есть активное хранилище (vault)
+   */
+  canUploadFiles(): boolean {
+    const typeId = this.objectForm.get('typeId')?.value;
+    if (!typeId) {
+      return false;
+    }
+    const type = this.typesCache.find(t => t.id === typeId);
+
+    if (!type) {
+      return false;
+    }
+    // Проверяем, есть ли активное хранилище (vault)
+    const vault = (type as any).vault;
+
+
+    return !!(vault && vault.isActive);
+  }
+
+
 
 }

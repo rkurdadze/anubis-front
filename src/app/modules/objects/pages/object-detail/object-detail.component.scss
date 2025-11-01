@@ -75,3 +75,25 @@
     transform: translateY(0);
   }
 }
+
+
+
+.nav-link-wrapper {
+  display: inline-block;
+}
+
+.nav-link.disabled {
+  background-color: #e0e0e0; /* светло-серый фон */
+  color: #7a7a7a !important; /* серый текст */
+  border-color: #d0d0d0; /* светлая рамка, если есть */
+  opacity: 1; /* не приглушаем, фон уже серый */
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Чтобы при наведении не менялся цвет */
+.nav-link.disabled:hover,
+.nav-link.disabled:focus {
+  background-color: #e0e0e0;
+  color: #7a7a7a !important;
+}

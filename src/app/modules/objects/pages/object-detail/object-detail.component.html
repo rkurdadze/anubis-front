@@ -140,10 +140,27 @@
                 (click)="setActiveTab('versions')">
           Версии
         </button>
-        <button type="button" class="nav-link" [ngClass]="{active: activeTab === 'files'}"
-                (click)="setActiveTab('files')">
-          Файлы
-        </button>
+
+        <div
+          [attr.title]="!canUploadFiles() ? 'Vault for the type is not set/inactive' : null"
+          class="nav-link-wrapper"
+        >
+          <button
+            type="button"
+            class="nav-link"
+            [ngClass]="{
+                active: activeTab === 'files',
+                disabled: !canUploadFiles()
+              }"
+            (click)="canUploadFiles() && setActiveTab('files')"
+            [disabled]="!canUploadFiles()"
+          >
+            Файлы
+          </button>
+        </div>
+
+
+
         <button type="button" class="nav-link" [ngClass]="{active: activeTab === 'links'}"
                 (click)="setActiveTab('links')">
           Связи
@@ -356,6 +373,7 @@
                     <i class="fa-solid fa-upload"></i>
                     <span class="ms-1">Загрузить</span>
                   </label>
+
                 </div>
                 <div class="card-body">
                   <div *ngIf="(objectFiles$ | async) as files">
@@ -432,7 +450,8 @@
                               class="list-group-item d-flex justify-content-between align-items-center">
                             <span>{{ file.filename }}</span>
                             <div class="action-buttons">
-                              <button type="button" class="btn btn-outline-secondary btn-icon" (click)="downloadFile(file)">
+                              <button type="button" class="btn btn-outline-secondary btn-icon"
+                                      (click)="downloadFile(file)">
                                 <i class="fa-solid fa-download"></i>
                                 <span class="visually-hidden">Скачать</span>
                               </button>
