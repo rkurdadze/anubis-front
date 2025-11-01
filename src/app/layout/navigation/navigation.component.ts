@@ -26,10 +26,9 @@ export class NavigationComponent {
     { label: 'Свойства', icon: 'fa-solid fa-table-cells-large', route: '/properties' },
     { label: 'Классы', icon: 'fa-solid fa-layer-group', route: '/classes' },
     { label: 'Объекты', icon: 'fa-solid fa-box-archive', route: '/objects' },
-
-    { label: 'Пользователи', icon: 'fa-solid fa-users-gear', route: '/users' },
-    { label: 'Группы', icon: 'fa-solid fa-people-group', route: '/groups' },
     { label: 'Роли', icon: 'fa-solid fa-user-shield', route: '/roles' },
+    { label: 'Группы', icon: 'fa-solid fa-people-group', route: '/groups' },
+    { label: 'Пользователи', icon: 'fa-solid fa-users-gear', route: '/users' },
     { label: 'ACL', icon: 'fa-solid fa-lock', route: '/acls' },
     { label: 'Представления', icon: 'fa-solid fa-folder-tree', route: '/views' },
     { label: 'Поиск', icon: 'fa-solid fa-magnifying-glass', route: '/search' }
