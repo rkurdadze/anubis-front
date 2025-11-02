@@ -16,13 +16,13 @@ import {
   Validators
 } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import {BehaviorSubject, Observable, Subject, combineLatest, of, delay, filter, pairwise} from 'rxjs';
+import {BehaviorSubject, Observable, Subject, combineLatest, of, filter, pairwise} from 'rxjs';
 import {
   catchError,
   map,
   shareReplay,
   startWith,
-  switchMap, take,
+  switchMap,
   takeUntil,
   tap
 } from 'rxjs/operators';
@@ -33,7 +33,6 @@ import { ClassApi } from '../../../../core/api/class.api';
 import { ObjectVersionApi } from '../../../../core/api/object-version.api';
 import { ObjectPropertyValueApi } from '../../../../core/api/object-property-value.api';
 import { PropertyDefinitionApi } from '../../../../core/api/property-def.api';
-import { FileApi } from '../../../../core/api/file.api';
 import { ObjectLinkApi } from '../../../../core/api/object-link.api';
 import { LinkRoleApi } from '../../../../core/api/link-role.api';
 import { RepositoryObject } from '../../../../core/models/object.model';
@@ -42,13 +41,13 @@ import { ObjectClass } from '../../../../core/models/class.model';
 import { ObjectVersion, ObjectVersionDetail } from '../../../../core/models/object-version.model';
 import { PropertyValue } from '../../../../core/models/property-value.model';
 import { PropertyDefinition } from '../../../../core/models/property-def.model';
-import { ObjectFile } from '../../../../core/models/object.model';
 import { ObjectLink } from '../../../../core/models/object-link.model';
 import { LinkRole } from '../../../../core/models/link-role.model';
 import { LinkDirection } from '../../../../core/models/object-link-direction.enum';
 import { ObjectVersionAudit } from '../../../../core/models/object-version-audit.model';
 import { PropertyDataType } from '../../../../core/models/property-data-type.enum';
 import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { ObjectFilesTabComponent } from './components/files-tab/object-files-tab.component';
 
 interface VersionWithAudit {
   version: ObjectVersion | null;
@@ -81,7 +80,8 @@ type PropertyFormGroup = FormGroup<{
     NgSwitchDefault,
     ReactiveFormsModule,
     RouterLink,
-    FormsModule
+    FormsModule,
+    ObjectFilesTabComponent
   ],
   templateUrl: './object-detail.component.html',
   styleUrls: ['./object-detail.component.scss'],
@@ -96,7 +96,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly objectVersionApi = inject(ObjectVersionApi);
   private readonly propertyValueApi = inject(ObjectPropertyValueApi);
   private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
-  private readonly fileApi = inject(FileApi);
   private readonly objectLinkApi = inject(ObjectLinkApi);
   private readonly linkRoleApi = inject(LinkRoleApi);
   private readonly uiMessages = inject(UiMessageService).create();
@@ -104,7 +103,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private readonly propertiesReload$ = new BehaviorSubject<void>(undefined);
-  private readonly filesReload$ = new BehaviorSubject<void>(undefined);
   private readonly linksReload$ = new BehaviorSubject<void>(undefined);
   private readonly auditReload$ = new BehaviorSubject<void>(undefined);
   private readonly selectedVersionSubject = new BehaviorSubject<number | null>(null);
@@ -329,35 +327,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     shareReplay(1)
   );
 
-  readonly objectFiles$ = combineLatest([this.objectId$, this.filesReload$]).pipe(
-    switchMap(([objectId]) =>
-      Number.isNaN(objectId)
-        ? of<ObjectFile[]>([])
-        : this.fileApi.listByObject(objectId).pipe(
-            catchError(() => {
-              this.showMessage('error', 'Не удалось загрузить файлы объекта.');
-              return of<ObjectFile[]>([]);
-            })
-          )
-    ),
-    shareReplay(1)
-  );
-
-  readonly versionFiles$ = combineLatest([this.selectedVersionId$, this.filesReload$]).pipe(
-    switchMap(([versionId]) => {
-      if (!versionId) {
-        return of<ObjectFile[]>([]);
-      }
-      return this.fileApi.listByVersion(versionId).pipe(
-        catchError(() => {
-          this.showMessage('error', 'Не удалось загрузить файлы версии.');
-          return of<ObjectFile[]>([]);
-        })
-      );
-    }),
-    shareReplay(1)
-  );
-
   readonly links$ = combineLatest([this.objectId$, this.linksReload$]).pipe(
     switchMap(([objectId]) =>
       Number.isNaN(objectId)
@@ -385,7 +354,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   activeTab: 'properties' | 'versions' | 'files' | 'links' = 'properties';
   isSavingObject = false;
   isSavingProperties = false;
-  isUploadingFile = false;
   isLinkActionInProgress = false;
 
   hasChanges = false;
@@ -434,7 +402,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         this.selectedVersionModel = id;
       });
 
-
   }
 
   ngOnDestroy(): void {
@@ -475,7 +442,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   refreshAll(): void {
     this.reload$.next();
     this.propertiesReload$.next();
-    this.filesReload$.next();
     this.linksReload$.next();
     this.auditReload$.next();
   }
@@ -499,12 +465,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     }
 
     if (triggerReload) {
-      // ⚠️ убери эти строки:
-      // this.propertiesReload$.next();
-      // this.filesReload$.next();
-      // this.auditReload$.next();
-
-      // reload$ оставляем — он обновит объект и версии, если нужно
       this.reload$.next();
     }
   }
@@ -628,94 +588,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
 
   resetProperties(): void {
     this.propertiesReload$.next();
-  }
-
-  downloadFile(file: ObjectFile): void {
-    this.fileApi
-      .download(file.id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: blob => {
-          const url = window.URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.download = file.filename;
-          anchor.click();
-          window.URL.revokeObjectURL(url);
-        },
-        error: () => {
-          this.showMessage('error', 'Не удалось скачать файл.');
-        }
-      });
-  }
-
-  uploadFile(object: RepositoryObject | null, event: Event): void {
-    if (!object) {
-      return;
-    }
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) {
-      return;
-    }
-    this.isUploadingFile = true;
-    this.fileApi
-      .upload(object.id, file)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.showMessage('success', 'Файл загружен.');
-          this.isUploadingFile = false;
-          this.filesReload$.next();
-        },
-        error: () => {
-          this.showMessage('error', 'Не удалось загрузить файл.');
-          this.isUploadingFile = false;
-        }
-      });
-    input.value = '';
-  }
-
-  replaceFile(file: ObjectFile, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const newFile = input.files?.[0];
-    if (!newFile) {
-      return;
-    }
-    this.isUploadingFile = true;
-    this.fileApi
-      .updateFile(file.id, newFile)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.showMessage('success', 'Файл обновлён.');
-          this.isUploadingFile = false;
-          this.filesReload$.next();
-        },
-        error: () => {
-          this.showMessage('error', 'Не удалось заменить файл.');
-          this.isUploadingFile = false;
-        }
-      });
-    input.value = '';
-  }
-
-  deleteFile(file: ObjectFile): void {
-    if (!window.confirm(`Удалить файл «${file.filename}»?`)) {
-      return;
-    }
-    this.fileApi
-      .delete(file.id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.showMessage('success', 'Файл удалён.');
-          this.filesReload$.next();
-        },
-        error: () => {
-          this.showMessage('error', 'Не удалось удалить файл.');
-        }
-      });
   }
 
   createLink(object: RepositoryObject | null): void {
@@ -884,6 +756,10 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
 
   private showMessage(type: UiMessage['type'], text: string): void {
     this.uiMessages.show({ type, text });
+  }
+
+  handleFilesMessage(message: UiMessage): void {
+    this.showMessage(message.type, message.text);
   }
 
   onVersionDropdownChange(versionId: number | null): void {

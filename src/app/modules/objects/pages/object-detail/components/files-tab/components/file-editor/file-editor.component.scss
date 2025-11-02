@@ -1,0 +1,49 @@
+.file-editor {
+  textarea {
+    font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  }
+
+  .rich-editor-toolbar {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .rich-editor__surface {
+    min-height: 16rem;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background: #ffffff;
+    overflow-y: auto;
+    transition: background-color 0.2s ease;
+
+    &--disabled {
+      background: #f8f9fa;
+      pointer-events: none;
+    }
+
+    p {
+      margin-bottom: 0.5rem;
+    }
+  }
+
+  .spreadsheet-editor__table {
+    max-height: 24rem;
+    overflow: auto;
+
+    table {
+      min-width: 100%;
+
+      th,
+      td {
+        min-width: 6rem;
+        vertical-align: middle;
+        padding: 0.35rem 0.5rem;
+      }
+
+      input {
+        min-width: 5rem;
+      }
+    }
+  }
+}

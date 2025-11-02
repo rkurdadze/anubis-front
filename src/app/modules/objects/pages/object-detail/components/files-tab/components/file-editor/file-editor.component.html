@@ -1,0 +1,114 @@
+<div *ngIf="pages[currentPage] as page" class="file-editor" [ngSwitch]="kind">
+  <ng-container *ngSwitchCase="'text'">
+    <ng-container *ngIf="asText(page) as textData">
+      <textarea
+        class="form-control"
+        rows="12"
+        [ngModel]="textData.editedText"
+        (ngModelChange)="onTextChange($event)"
+        [disabled]="saving"
+      ></textarea>
+    </ng-container>
+  </ng-container>
+
+  <ng-container *ngSwitchCase="'pdf'">
+    <ng-container *ngIf="asPdf(page) as pdfData">
+      <label class="form-label">Текст текущей страницы</label>
+      <textarea
+        class="form-control"
+        rows="12"
+        [ngModel]="pdfData.editedText"
+        (ngModelChange)="onTextChange($event)"
+        [disabled]="saving"
+      ></textarea>
+      <p class="text-muted small mt-2">
+        При сохранении текст будет перезаписан в исходном PDF как базовый слой.
+      </p>
+    </ng-container>
+  </ng-container>
+
+  <ng-container *ngSwitchCase="'docx'">
+    <div class="rich-editor-toolbar mb-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="onExecuteCommand('bold')" [disabled]="saving">
+        <i class="fa-solid fa-bold"></i>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="onExecuteCommand('italic')" [disabled]="saving">
+        <i class="fa-solid fa-italic"></i>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="onExecuteCommand('underline')" [disabled]="saving">
+        <i class="fa-solid fa-underline"></i>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="onExecuteCommand('insertUnorderedList')" [disabled]="saving">
+        <i class="fa-solid fa-list-ul"></i>
+      </button>
+    </div>
+    <ng-container *ngIf="asHtml(page) as htmlData">
+      <div
+        class="rich-editor__surface"
+        contenteditable="true"
+        [attr.aria-label]="'Редактор документа'"
+        [ngClass]="{ 'rich-editor__surface--disabled': saving }"
+        [innerHTML]="htmlData.editedHtml"
+        (input)="onHtmlInput($event)"
+      ></div>
+    </ng-container>
+  </ng-container>
+
+  <ng-container *ngSwitchCase="'spreadsheet'">
+    <ng-container *ngIf="asSheet(page) as sheetData">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <label class="form-label mb-0">Название листа</label>
+        <input
+          type="text"
+          class="form-control form-control-sm w-auto"
+          [ngModel]="page.label"
+          (ngModelChange)="onSheetNameChange($event)"
+          [disabled]="saving"
+        />
+        <span class="vr"></span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="addSpreadsheetRow()" [disabled]="saving">
+          <i class="fa-solid fa-plus me-1"></i>
+          Строка
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="addSpreadsheetColumn()" [disabled]="saving">
+          <i class="fa-solid fa-plus me-1"></i>
+          Столбец
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="removeSpreadsheetRow()" [disabled]="saving">
+          <i class="fa-solid fa-minus me-1"></i>
+          Строка
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="removeSpreadsheetColumn()" [disabled]="saving">
+          <i class="fa-solid fa-minus me-1"></i>
+          Столбец
+        </button>
+      </div>
+      <div class="table-responsive spreadsheet-editor__table">
+        <table class="table table-bordered table-sm align-middle">
+          <thead>
+            <tr>
+              <th class="text-center text-muted">#</th>
+              <th *ngFor="let header of getSpreadsheetColumnHeaders(sheetData); trackBy: trackByIndex" class="text-center text-muted">
+                {{ header }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of getSpreadsheetRows(sheetData); let rowIndex = index; trackBy: trackByIndex">
+              <th class="text-center text-muted">{{ rowIndex + 1 }}</th>
+              <td *ngFor="let cell of row; let colIndex = index; trackBy: trackByIndex">
+                <input
+                  type="text"
+                  class="form-control form-control-sm"
+                  [value]="cell"
+                  (input)="onSpreadsheetCellChange(rowIndex, colIndex, $any($event.target).value)"
+                  [disabled]="saving"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </ng-container>
+  </ng-container>
+</div>

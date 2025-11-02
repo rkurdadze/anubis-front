@@ -362,113 +362,11 @@
         </section>
 
         <section *ngSwitchCase="'files'">
-          <div class="row g-4">
-            <div class="col-lg-6">
-              <div class="card border-0 anubis-shadow h-100">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                  <h3 class="h6 mb-0">Файлы объекта</h3>
-                  <label class="btn btn-outline-primary btn-sm mb-0">
-                    <input type="file" class="d-none" (change)="uploadFile(object, $event)"
-                           [disabled]="isUploadingFile"/>
-                    <i class="fa-solid fa-upload"></i>
-                    <span class="ms-1">Загрузить</span>
-                  </label>
-
-                </div>
-                <div class="card-body">
-                  <div *ngIf="(objectFiles$ | async) as files">
-                    <p *ngIf="!files.length" class="text-muted mb-0">Файлы не прикреплены.</p>
-                    <ul class="list-group" *ngIf="files.length">
-                      <li *ngFor="let file of files; trackBy: trackById"
-                          class="list-group-item d-flex justify-content-between align-items-center gap-3">
-                        <div>
-                          <div class="fw-semibold">{{ file.filename }}</div>
-                          <div class="text-muted small">Размер: {{ file.size | number }} Б</div>
-                        </div>
-
-                        <!-- Внутри секции *ngSwitchCase="'files'", элемент <li *ngFor="let file of files"> -->
-                        <div class="action-buttons">
-                          <!-- Скачать -->
-                          <button
-                            type="button"
-                            class="btn btn-outline-secondary btn-icon"
-                            (click)="downloadFile(file)"
-                          >
-                            <i class="fa-solid fa-download"></i>
-                            <span class="visually-hidden">Скачать</span>
-                          </button>
-
-                          <!-- Заменить: триггерим клик по скрытому input -->
-                          <button
-                            type="button"
-                            class="btn btn-outline-primary btn-icon"
-                            (click)="replaceInput.click()"
-                            [disabled]="isUploadingFile"
-                          >
-                            <i class="fa-solid fa-arrows-rotate"></i>
-                            <span class="visually-hidden">Заменить файл</span>
-                          </button>
-                          <input
-                            #replaceInput
-                            type="file"
-                            class="d-none"
-                            (change)="replaceFile(file, $event)"
-                          />
-
-                          <!-- Удалить -->
-                          <button
-                            type="button"
-                            class="btn btn-outline-danger btn-icon"
-                            (click)="deleteFile(file)"
-                          >
-                            <i class="fa-solid fa-trash"></i>
-                            <span class="visually-hidden">Удалить</span>
-                          </button>
-                        </div>
-
-
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-lg-6">
-              <div class="card border-0 anubis-shadow h-100">
-                <div class="card-header bg-white">
-                  <h3 class="h6 mb-0">Файлы выбранной версии</h3>
-                </div>
-                <div class="card-body">
-                  <ng-container *ngIf="selectedVersionWithAudit$ | async as versionInfo">
-                    <p class="text-muted" *ngIf="!versionInfo.version">Выберите версию, чтобы увидеть файлы.</p>
-                    <div *ngIf="versionInfo.version">
-                      <div *ngIf="(versionFiles$ | async) as versionFiles">
-                        <p *ngIf="!versionFiles.length" class="text-muted mb-0">Для версии нет файлов.</p>
-                        <ul *ngIf="versionFiles.length" class="list-group">
-                          <li *ngFor="let file of versionFiles; trackBy: trackById"
-                              class="list-group-item d-flex justify-content-between align-items-center">
-                            <span>{{ file.filename }}</span>
-                            <div class="action-buttons">
-                              <button type="button" class="btn btn-outline-secondary btn-icon"
-                                      (click)="downloadFile(file)">
-                                <i class="fa-solid fa-download"></i>
-                                <span class="visually-hidden">Скачать</span>
-                              </button>
-                              <button type="button" class="btn btn-outline-danger btn-icon" (click)="deleteFile(file)">
-                                <i class="fa-solid fa-trash"></i>
-                                <span class="visually-hidden">Удалить</span>
-                              </button>
-                            </div>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </ng-container>
-                </div>
-              </div>
-            </div>
-          </div>
+          <app-object-files-tab
+            [object]="object"
+            [canUpload]="canUploadFiles()"
+            (message)="handleFilesMessage($event)"
+          ></app-object-files-tab>
         </section>
 
         <section *ngSwitchCase="'links'">

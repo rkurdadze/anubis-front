@@ -1,0 +1,174 @@
+<div class="card border-0 anubis-shadow h-100 file-preview-card">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <div class="file-icon file-icon--preview" *ngIf="file">
+        <i [ngClass]="fileIcon"></i>
+      </div>
+      <div>
+        <h3 class="h6 mb-0">Предпросмотр файла</h3>
+        <div class="text-muted small" *ngIf="file">
+          {{ file.filename }}
+          <span *ngIf="file.size"> · {{ formatSize(file.size) }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2" *ngIf="state.data as data">
+      <div class="text-muted small">{{ (data.zoom * 100) | number:'1.0-0' }}%</div>
+      <button type="button" class="btn btn-outline-secondary btn-icon" (click)="onZoom(-0.1)" [disabled]="loading || saving">
+        <i class="fa-solid fa-magnifying-glass-minus"></i>
+        <span class="visually-hidden">Уменьшить</span>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-icon" (click)="onZoom(0.1)" [disabled]="loading || saving">
+        <i class="fa-solid fa-magnifying-glass-plus"></i>
+        <span class="visually-hidden">Увеличить</span>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-icon" (click)="resetZoom()" [disabled]="loading || saving">
+        <i class="fa-solid fa-arrows-rotate"></i>
+        <span class="visually-hidden">По размеру</span>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-icon" (click)="toggleFullscreen()">
+        <i class="fa-solid fa-expand"></i>
+        <span class="visually-hidden">На весь экран</span>
+      </button>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        (click)="toggleEditing()"
+        [disabled]="!data.editable || loading || saving"
+      >
+        <i class="fa-solid" [ngClass]="state.isEditing ? 'fa-pen-to-square' : 'fa-pen'"></i>
+        <span class="ms-1">{{ state.isEditing ? 'Завершить редактирование' : 'Редактировать' }}</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card-body" #previewWrapper>
+    <div *ngIf="loading" class="text-center text-muted py-5">
+      <span class="spinner-border text-primary"></span>
+      <div class="mt-2">Загружаем содержимое файла…</div>
+    </div>
+
+    <div *ngIf="!loading && error" class="alert alert-danger mb-0">{{ error }}</div>
+
+    <ng-container *ngIf="!loading && !error">
+      <p class="text-muted mb-0" *ngIf="!file">Выберите файл из списка слева, чтобы просмотреть содержимое.</p>
+
+      <ng-container *ngIf="file && state.data as data">
+        <div *ngIf="data.pages.length > 1" class="preview-nav d-flex flex-wrap align-items-center gap-2 mb-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="onPageChange(data.currentPage - 1)" [disabled]="data.currentPage === 0">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <div class="d-flex align-items-center gap-2">
+            <input
+              type="number"
+              class="form-control form-control-sm preview-nav__input"
+              [ngModel]="data.currentPage + 1"
+              (ngModelChange)="onPageInput($event)"
+              min="1"
+              [max]="data.pages.length"
+            />
+            <span class="text-muted">/ {{ data.pages.length }}</span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            (click)="onPageChange(data.currentPage + 1)"
+            [disabled]="data.currentPage === data.pages.length - 1"
+          >
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+          <select
+            class="form-select form-select-sm preview-nav__select"
+            [ngModel]="data.currentPage"
+            (ngModelChange)="onPageChange($event)"
+          >
+            <option *ngFor="let pageItem of data.pages; let i = index" [ngValue]="i">{{ pageItem.label }}</option>
+          </select>
+        </div>
+
+        <div class="preview-stage" #stage>
+          <div class="preview-stage__canvas" [ngStyle]="canvasStyle">
+            <ng-container [ngSwitch]="data.kind">
+             <img
+                *ngSwitchCase="'image'"
+                [src]="imageResourceUrl"
+                alt="Предпросмотр"
+                class="preview-stage__image"
+              />
+
+              <iframe
+                *ngSwitchCase="'pdf'"
+                class="preview-stage__frame"
+                [src]="pdfResourceUrl"
+                title="Предпросмотр PDF"
+              ></iframe>
+
+              <div *ngSwitchCase="'docx'" class="preview-stage__docx" [innerHTML]="docxPreviewHtml"></div>
+
+              <ng-container *ngSwitchCase="'spreadsheet'">
+                <div class="preview-stage__sheet" *ngIf="asSheet(currentPage) as sheetData">
+                  <table class="table table-bordered table-sm">
+                    <thead>
+                      <tr>
+                        <th class="text-center text-muted">#</th>
+                        <th *ngFor="let header of getSpreadsheetHeaders(sheetData); trackBy: trackByIndex" class="text-center text-muted">
+                          {{ header }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let row of getSpreadsheetRows(sheetData); let rowIndex = index; trackBy: trackByIndex">
+                        <th class="text-center text-muted">{{ rowIndex + 1 }}</th>
+                        <td *ngFor="let cell of row; trackBy: trackByIndex">{{ cell }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </ng-container>
+
+              <ng-container *ngSwitchCase="'text'">
+                <ng-container *ngIf="asText(currentPage) as textData">
+                  <textarea
+                    *ngIf="state.isEditing"
+                    class="preview-stage__text-editor"
+                    [ngModel]="textData.editedText"
+                    (ngModelChange)="onTextEdit($event)"
+                    [disabled]="saving"
+                  ></textarea>
+                  <pre *ngIf="!state.isEditing" class="preview-stage__text">{{ textData.editedText }}</pre>
+                </ng-container>
+              </ng-container>
+
+              <div *ngSwitchDefault class="preview-stage__fallback">
+                <p class="text-muted mb-0">Предпросмотр недоступен. Используйте скачивание файла.</p>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+
+        <div *ngIf="state.isEditing && data.editable && data.kind !== 'text'" class="preview-editor mt-3">
+          <app-file-editor
+            [kind]="data.kind"
+            [pages]="data.pages"
+            [currentPage]="data.currentPage"
+            [saving]="saving"
+            (pageDataChange)="onPageDataChange($event)"
+            (pageLabelChange)="onPageLabelChange($event)"
+          ></app-file-editor>
+
+          <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" (click)="onReset()" [disabled]="saving">
+              <i class="fa-solid fa-rotate-left me-1"></i>
+              Сбросить
+            </button>
+            <button type="button" class="btn btn-primary" (click)="onSave()" [disabled]="saving">
+              <span *ngIf="saving" class="spinner-border spinner-border-sm me-1"></span>
+              <i class="fa-solid fa-floppy-disk me-1"></i>
+              Сохранить
+            </button>
+          </div>
+        </div>
+      </ng-container>
+    </ng-container>
+  </div>
+</div>
