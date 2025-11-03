@@ -47,6 +47,7 @@ import {
   buildPdfViewerUrl
 } from '../../helpers/file-preview.helpers';
 import { FileEditorComponent } from '../file-editor/file-editor.component';
+import {PDFDocumentProxy, PdfViewerModule} from 'ng2-pdf-viewer';
 
 @Component({
   selector: 'app-file-preview',
@@ -62,7 +63,8 @@ import { FileEditorComponent } from '../file-editor/file-editor.component';
     NgSwitch,
     NgSwitchCase,
     NgSwitchDefault,
-    FileEditorComponent
+    FileEditorComponent,
+    PdfViewerModule
   ],
   templateUrl: './file-preview.component.html',
   styleUrls: ['./file-preview.component.scss'],
@@ -103,32 +105,24 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   /** Флаг, что пользователь менял зум вручную */
   manualZoom = false;
   private resizeObserver?: ResizeObserver;
+  pdfSrc?: string;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['file'] || changes['blob']) {
       this.resetState();
-      if (this.file && this.blob) {
-        void this.preparePreview(this.file, this.blob);
-      }
+      if (this.file && this.blob) void this.preparePreview(this.file, this.blob);
     }
-    if (changes['loading']) {
-      this.state = { ...this.state, loading: this.loading };
-    }
-    if (changes['error']) {
-      this.state = { ...this.state, error: this.error };
-    }
-    if (changes['saving']) {
-      this.state = { ...this.state, saving: this.saving };
-    }
+    if (changes['loading']) this.state = { ...this.state, loading: this.loading };
+    if (changes['error']) this.state = { ...this.state, error: this.error };
+    if (changes['saving']) this.state = { ...this.state, saving: this.saving };
     this.cdr.markForCheck();
   }
+
 
   ngAfterViewInit(): void {
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => this.fitPreviewToStage());
-      if (this.stageRef?.nativeElement) {
-        this.resizeObserver.observe(this.stageRef.nativeElement);
-      }
+      if (this.stageRef?.nativeElement) this.resizeObserver.observe(this.stageRef.nativeElement);
     }
   }
 
@@ -139,6 +133,32 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
       window.URL.revokeObjectURL(url);
     }
   }
+
+  // Возвращает корректный src для <pdf-viewer>
+  get pdfViewerSrc(): string | undefined {
+    return this.pdfSrc;
+  }
+
+
+  onPdfLoaded(pdf: PDFDocumentProxy): void {
+    // Можно использовать pdf.numPages, pdf.getPage() и т.д.
+    // Добавляем подсветку текста
+    setTimeout(() => {
+      const spans = document.querySelectorAll('.textLayer span');
+      spans.forEach(span => {
+        const text = span.textContent?.trim();
+        if (text && text.includes('ტესტ')) {
+          span.innerHTML = span.textContent!.replaceAll(
+            'ტესტ',
+            '<mark class="pdf-highlight">ტესტ</mark>'
+          );
+        }
+      });
+    }, 500);
+  }
+
+
+
 
   get fileIcon(): string {
     return this.file ? getFileIconClass(this.file) : 'fa-solid fa-file text-secondary';
@@ -413,9 +433,7 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   }
 
   private resetState(): void {
-    if (this.state.data?.objectUrl) {
-      window.URL.revokeObjectURL(this.state.data.objectUrl);
-    }
+    if (this.pdfSrc) URL.revokeObjectURL(this.pdfSrc);
     this.state = {
       file: this.file,
       loading: this.loading,
@@ -495,32 +513,32 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   }
 
   private async loadPdfPreview(file: ObjectFile, blob: Blob): Promise<void> {
-    const buffer = await blob.arrayBuffer();
-    const pages = PdfHelper.extractPages(buffer).map((page, index) => ({
-      label: `Стр. ${index + 1}`,
-      width: 595,
-      height: 842,
-      data: page
-    }));
+    // 1️⃣ создаём blob-URL без sanitizer
     const url = window.URL.createObjectURL(blob);
-    const safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(buildPdfViewerUrl(url, 0, 1));
+    this.pdfSrc = url;
+
+    // 2️⃣ сохраняем состояние предпросмотра
     this.state = {
       ...this.state,
       loading: false,
       error: null,
       data: {
         kind: 'pdf',
-        pages,
+        pages: [],
         currentPage: 0,
         zoom: 1,
         fitZoom: 1,
-        editable: true,
+        editable: false,
         objectUrl: url,
-        resourceUrl: safeUrl,
+        resourceUrl: null,
         baseUrl: url
       }
     };
+
+    // 3️⃣ триггерим обновление UI
+    this.cdr.markForCheck();
   }
+
 
   private async loadDocxPreview(file: ObjectFile, blob: Blob): Promise<void> {
     const buffer = await blob.arrayBuffer();
