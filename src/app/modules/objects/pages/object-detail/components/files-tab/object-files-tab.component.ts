@@ -26,7 +26,7 @@ import { UiMessage } from '../../../../../../shared/services/ui-message.service'
 import {
   FilePreviewComponent
 } from './components/file-preview/file-preview.component';
-import { getFileIconClass, formatFileSize } from './helpers/file-preview.helpers';
+import { determinePreviewKind, getFileIconClass, formatFileSize } from './helpers/file-preview.helpers';
 
 @Component({
   selector: 'app-object-files-tab',
@@ -175,8 +175,10 @@ export class ObjectFilesTabComponent implements OnDestroy {
     this.previewLoading = true;
     this.cdr.markForCheck();
 
-    this.fileApi
-      .download(file.id)
+    const useDownload = determinePreviewKind(file) === 'image';
+    const request$ = useDownload ? this.fileApi.download(file.id) : this.fileApi.preview(file.id);
+
+    request$
       .pipe(
         takeUntil(this.destroy$),
         finalize(() => {
@@ -186,7 +188,11 @@ export class ObjectFilesTabComponent implements OnDestroy {
       )
       .subscribe({
         next: blob => {
-          this.previewBlob = blob;
+          let result = blob;
+          if (!useDownload && blob.type.toLowerCase() !== 'application/pdf') {
+            result = new Blob([blob], { type: 'application/pdf' });
+          }
+          this.previewBlob = result;
           this.cdr.markForCheck();
         },
         error: () => {

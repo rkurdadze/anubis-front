@@ -432,7 +432,8 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     this.cdr.markForCheck();
 
     try {
-      const kind = this.resolveKind(file);
+      const blobType = (blob.type || '').toLowerCase();
+      const kind = blobType === 'application/pdf' ? 'pdf' : this.resolveKind(file);
       switch (kind) {
         case 'image':
           await this.loadImagePreview(file, blob);

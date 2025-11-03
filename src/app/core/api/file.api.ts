@@ -25,6 +25,12 @@ export class FileApi {
     });
   }
 
+  preview(fileId: number): Observable<Blob> {
+    return this.rawHttp.get(this.http.resolveUrl(`${this.baseUrl}/${fileId}/preview`), {
+      responseType: 'blob'
+    });
+  }
+
   upload(objectId: number, file: File): Observable<ObjectFile> {
     const formData = new FormData();
     formData.append('objectId', String(objectId));
