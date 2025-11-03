@@ -5,7 +5,6 @@ import {
   Component,
   ElementRef,
   EventEmitter,
-  Inject,
   Input,
   OnChanges,
   OnDestroy,
@@ -31,23 +30,19 @@ import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-brows
 import { ObjectFile } from '../../../../../../../../core/models/object.model';
 import { UiMessage } from '../../../../../../../../shared/services/ui-message.service';
 import {
-  DocxHelper,
   FilePreviewPage,
   FilePreviewState,
   PdfHelper,
-  SpreadsheetPageData,
-  TextPageData,
-  HtmlPageData,
   PdfPageData,
   BinaryPageData,
-  XlsxHelper,
   formatFileSize,
   determinePreviewKind,
   getFileIconClass,
-  buildPdfViewerUrl
-} from '../../helpers/file-preview.helpers';
+  buildPdfViewerUrl, HtmlPageData, TextPageData, FilePreviewData
+} from './file-preview.helpers';
 import { FileEditorComponent } from '../file-editor/file-editor.component';
-import {PDFDocumentProxy, PdfViewerModule} from 'ng2-pdf-viewer';
+import {NgxExtendedPdfViewerComponent, NgxExtendedPdfViewerModule} from 'ngx-extended-pdf-viewer';
+
 
 @Component({
   selector: 'app-file-preview',
@@ -64,7 +59,7 @@ import {PDFDocumentProxy, PdfViewerModule} from 'ng2-pdf-viewer';
     NgSwitchCase,
     NgSwitchDefault,
     FileEditorComponent,
-    PdfViewerModule
+    NgxExtendedPdfViewerModule
   ],
   templateUrl: './file-preview.component.html',
   styleUrls: ['./file-preview.component.scss'],
@@ -91,6 +86,7 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
 
   @ViewChild('stage', { static: false }) stageRef?: ElementRef<HTMLDivElement>;
   @ViewChild('previewWrapper', { static: false }) previewWrapper?: ElementRef<HTMLDivElement>;
+  @ViewChild('pdfViewer') pdfViewer?: NgxExtendedPdfViewerComponent;
 
   /** Текущее состояние предпросмотра */
   state: FilePreviewState = {
@@ -140,21 +136,101 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   }
 
 
-  onPdfLoaded(pdf: PDFDocumentProxy): void {
-    // Можно использовать pdf.numPages, pdf.getPage() и т.д.
-    // Добавляем подсветку текста
-    setTimeout(() => {
-      const spans = document.querySelectorAll('.textLayer span');
-      spans.forEach(span => {
-        const text = span.textContent?.trim();
-        if (text && text.includes('ტესტ')) {
-          span.innerHTML = span.textContent!.replaceAll(
-            'ტესტ',
-            '<mark class="pdf-highlight">ტესტ</mark>'
-          );
-        }
-      });
-    }, 500);
+  // onPdfLoaded(): void {
+  //   const pdfViewer = (this.pdfViewer as any)?.pdfViewer;
+  //   if (!pdfViewer?.pdfDocument) return;
+  //
+  //   const container = this.stageRef?.nativeElement;
+  //   const data = this.state.data;
+  //   if (container && data && data.kind === 'pdf') {
+  //     pdfViewer.pdfDocument.getPage(1).then((page: any) => {
+  //       const viewport = page.getViewport({ scale: 1 });
+  //       const fitZoom = Math.min(
+  //         container.clientWidth / viewport.width,
+  //         container.clientHeight / viewport.height
+  //       );
+  //
+  //       // ✅ Полностью совместимый объект типа FilePreviewData
+  //       const newData = {
+  //         ...data,
+  //         fitZoom,
+  //         zoom: fitZoom,
+  //         resourceUrl: this.sanitizer.bypassSecurityTrustResourceUrl(
+  //           buildPdfViewerUrl(data.baseUrl!, data.currentPage, fitZoom)
+  //         )
+  //       };
+  //
+  //       this.state = {
+  //         ...this.state,
+  //         data: newData
+  //       };
+  //       this.cdr.markForCheck();
+  //     });
+  //   }
+  //
+  //   // Подсветка текста оставляем как было
+  //   setTimeout(() => {
+  //     const spans = document.querySelectorAll('.textLayer span') as NodeListOf<HTMLElement>;
+  //     spans.forEach(span => {
+  //       const text = span.textContent?.trim();
+  //       if (text?.includes('ტესტ')) {
+  //         span.innerHTML = span.innerHTML.replaceAll('ტესტ', '<mark class="pdf-highlight">ტესტ</mark>');
+  //       }
+  //     });
+  //   }, 500);
+  // }
+
+
+  onPdfLoaded(): void {
+    const pdfViewer = (this.pdfViewer as any)?.pdfViewer;
+    if (!pdfViewer?.pdfDocument) return;
+
+    const data = this.state.data;
+    const container = this.stageRef?.nativeElement;
+    if (!data || data.kind !== 'pdf' || !container) return;
+
+    pdfViewer.pdfDocument.getPage(1).then((page: any) => {
+      const viewport = page.getViewport({ scale: 1 });
+      const fitZoom = Math.min(
+        container.clientWidth / viewport.width,
+        container.clientHeight / viewport.height
+      );
+
+      const updatedData: FilePreviewData = {
+        ...data,
+        fitZoom,
+        zoom: 'page-fit',
+      };
+
+      this.state = {
+        ...this.state,
+        data: updatedData
+      };
+      this.cdr.markForCheck();
+    });
+
+  }
+
+
+  onTextLayerRendered(): void {
+    const spans = document.querySelectorAll('.textLayer span') as NodeListOf<HTMLElement>;
+    spans.forEach(span => {
+      const text = span.textContent?.trim();
+      if (text?.includes('ტესტ')) {
+        span.innerHTML = span.innerHTML.replaceAll('ტესტ', '<mark class="pdf-highlight">ტესტ</mark>');
+      }
+    });
+  }
+
+
+  get zoomPercent(): number {
+    const data = this.state.data;
+    if (!data) return 100;
+
+    const zoomValue =
+      typeof data.zoom === 'number' ? data.zoom : data.fitZoom ?? 1;
+
+    return zoomValue * 100;
   }
 
 
@@ -231,7 +307,10 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     if (!this.state.data) {
       return;
     }
-    const nextZoom = Math.min(4, Math.max(0.25, +(this.state.data.zoom + delta).toFixed(2)));
+    const currentZoom =
+      typeof this.state.data.zoom === 'number' ? this.state.data.zoom : this.state.data.fitZoom;
+
+    const nextZoom = Math.min(4, Math.max(0.25, +(currentZoom + delta).toFixed(2)));
     this.manualZoom = true;
     this.updateZoom(nextZoom);
   }
@@ -255,7 +334,12 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     const data = { ...this.state.data, currentPage: bounded };
     if (data.kind === 'pdf' && data.baseUrl) {
       data.resourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
-        buildPdfViewerUrl(data.baseUrl, bounded, data.zoom)
+        buildPdfViewerUrl(
+          data.baseUrl,
+          data.currentPage,
+          typeof data.zoom === 'number' ? data.zoom : data.fitZoom
+        )
+
       );
     }
     if (!this.manualZoom) {
@@ -317,88 +401,13 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     };
   }
 
-  getSpreadsheetHeaders(data: SpreadsheetPageData | null): string[] {
-    if (!data) {
-      return [];
-    }
-    const columnCount = this.getSpreadsheetColumnCount(data.editedGrid);
-    return Array.from({ length: columnCount }, (_, index) => this.columnName(index));
-  }
-
-  getSpreadsheetRows(data: SpreadsheetPageData | null): string[][] {
-    if (!data) {
-      return [];
-    }
-    const columnCount = this.getSpreadsheetColumnCount(data.editedGrid);
-    return data.editedGrid.slice(0, 20).map(row => {
-      const next = [...row];
-      while (next.length < columnCount) {
-        next.push('');
-      }
-      return next;
-    });
-  }
-
-  trackByIndex(index: number): number {
-    return index;
-  }
-
-  onTextEdit(value: string): void {
-    if (!this.state.data || this.state.data.kind !== 'text') {
-      return;
-    }
-    const pageIndex = this.state.data.currentPage;
-    const target = this.state.data.pages[pageIndex];
-    if (!target) {
-      return;
-    }
-    const current = target.data as TextPageData;
-    const updatedPage: FilePreviewPage<TextPageData> = {
-      ...target,
-      data: { ...current, editedText: value }
-    };
-    const pages = this.state.data.pages.map((page, index) => (index === pageIndex ? updatedPage : page));
-    this.state = {
-      ...this.state,
-      data: { ...this.state.data, pages }
-    };
-    this.cdr.markForCheck();
-  }
-
-  async onSave(): Promise<void> {
-    if (!this.state.data || !this.file) {
-      return;
-    }
-    try {
-      const blob = await this.buildEditedBlob();
-      const file = new File([blob], this.file.filename, { type: blob.type || this.file.mimeType });
-      this.saveFile.emit(file);
-    } catch (error) {
-      console.error(error);
-      this.message.emit({ type: 'error', text: 'Не удалось подготовить изменения файла.' });
-    }
-  }
 
   onReset(): void {
     if (!this.state.data) {
       return;
     }
     const pages = this.state.data.pages.map(page => {
-      if (this.state.data?.kind === 'docx') {
-        const data = page.data as HtmlPageData;
-        return {
-          ...page,
-          data: { ...data, editedHtml: data.originalHtml }
-        };
-      }
-      if (this.state.data?.kind === 'spreadsheet') {
-        const data = page.data as SpreadsheetPageData;
-        const grid = data.originalGrid.map(row => [...row]);
-        return {
-          ...page,
-          data: { ...data, editedGrid: grid }
-        };
-      }
+
       if (this.state.data?.kind === 'pdf') {
         const data = page.data as PdfPageData;
         return {
@@ -459,15 +468,6 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
         case 'pdf':
           await this.loadPdfPreview(file, blob);
           break;
-        case 'docx':
-          await this.loadDocxPreview(file, blob);
-          break;
-        case 'spreadsheet':
-          await this.loadSpreadsheetPreview(file, blob);
-          break;
-        case 'text':
-          await this.loadTextPreview(file, blob);
-          break;
         default:
           await this.loadBinaryPreview(file, blob);
           break;
@@ -526,7 +526,7 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
         kind: 'pdf',
         pages: [],
         currentPage: 0,
-        zoom: 1,
+        zoom: 'page-width',
         fitZoom: 1,
         editable: false,
         objectUrl: url,
@@ -539,101 +539,6 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     this.cdr.markForCheck();
   }
 
-
-  private async loadDocxPreview(file: ObjectFile, blob: Blob): Promise<void> {
-    const buffer = await blob.arrayBuffer();
-    const html = await DocxHelper.extractHtml(buffer);
-    const page: FilePreviewPage<HtmlPageData> = {
-      label: 'Документ',
-      width: 793,
-      height: 1122,
-      data: {
-        originalHtml: html,
-        editedHtml: html
-      }
-    };
-    this.state = {
-      ...this.state,
-      loading: false,
-      error: null,
-      data: {
-        kind: 'docx',
-        pages: [page],
-        currentPage: 0,
-        zoom: 1,
-        fitZoom: 1,
-        editable: true,
-        objectUrl: undefined,
-        resourceUrl: null,
-        baseUrl: null
-      }
-    };
-  }
-
-  private async loadSpreadsheetPreview(file: ObjectFile, blob: Blob): Promise<void> {
-    const buffer = await blob.arrayBuffer();
-    const sheets = await XlsxHelper.extractSheets(buffer);
-    if (!sheets.length) {
-      throw new Error('Пустая рабочая книга.');
-    }
-    const pages: FilePreviewPage<SpreadsheetPageData>[] = sheets.map(sheet => {
-      const grid = sheet.grid.map(row => [...row]);
-      return {
-        label: sheet.name,
-        width: 1024,
-        height: 768,
-        data: {
-          originalGrid: sheet.grid.map(row => [...row]),
-          editedGrid: grid
-        }
-      };
-    });
-    this.state = {
-      ...this.state,
-      loading: false,
-      error: null,
-      data: {
-        kind: 'spreadsheet',
-        pages,
-        currentPage: 0,
-        zoom: 1,
-        fitZoom: 1,
-        editable: true,
-        objectUrl: undefined,
-        resourceUrl: null,
-        baseUrl: null
-      }
-    };
-  }
-
-  private async loadTextPreview(file: ObjectFile, blob: Blob): Promise<void> {
-    const text = await blob.text();
-    const page: FilePreviewPage<TextPageData> = {
-      label: 'Текст',
-      width: 793,
-      height: 1122,
-      data: {
-        originalText: text,
-        editedText: text
-      }
-    };
-    this.state = {
-      ...this.state,
-      loading: false,
-      error: null,
-      data: {
-        kind: 'text',
-        pages: [page],
-        currentPage: 0,
-        zoom: 1,
-        fitZoom: 1,
-        editable: true,
-        objectUrl: undefined,
-        resourceUrl: null,
-        baseUrl: null
-      }
-    };
-  }
 
   private async loadBinaryPreview(file: ObjectFile, blob: Blob): Promise<void> {
     const url = window.URL.createObjectURL(blob);
@@ -667,22 +572,6 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
       throw new Error('Нет данных для сохранения.');
     }
     switch (this.state.data.kind) {
-      case 'text': {
-        const page = this.state.data.pages[0].data as TextPageData;
-        return new Blob([page.editedText ?? ''], { type: this.file.mimeType || 'text/plain' });
-      }
-      case 'docx': {
-        const page = this.state.data.pages[0].data as HtmlPageData;
-        return DocxHelper.createDocument(page.editedHtml);
-      }
-      case 'spreadsheet': {
-        const pages = this.state.data.pages.map(page => {
-          const data = page.data as SpreadsheetPageData;
-          return data.editedGrid;
-        });
-        const names = this.state.data.pages.map(page => page.label);
-        return XlsxHelper.createWorkbook(names, pages);
-      }
       case 'pdf': {
         const pages = this.state.data.pages.map(page => page.data as PdfPageData);
         return PdfHelper.createPdf(pages);
@@ -725,7 +614,11 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     };
     if (data.kind === 'pdf' && data.baseUrl) {
       data.resourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
-        buildPdfViewerUrl(data.baseUrl, data.currentPage, data.zoom)
+        buildPdfViewerUrl(
+          data.baseUrl,
+          data.currentPage,
+          typeof data.zoom === 'number' ? data.zoom : data.fitZoom
+        )
       );
     }
     this.state = { ...this.state, data };
@@ -757,32 +650,24 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     });
   }
 
-  private getSpreadsheetColumnCount(grid: string[][]): number {
-    return grid.reduce((max, row) => Math.max(max, row.length), 0);
-  }
-
-  private columnName(index: number): string {
-    let name = '';
-    let current = index + 1;
-    while (current > 0) {
-      const remainder = (current - 1) % 26;
-      name = String.fromCharCode(65 + remainder) + name;
-      current = Math.floor((current - 1) / 26);
+  async onSave(): Promise<void> {
+    if (!this.state.data || !this.file) {
+      return;
     }
-    return name;
-  }
-
-  asText(page: FilePreviewPage | null): TextPageData | null {
-    return (page?.data as TextPageData) ?? null;
+    try {
+      const blob = await this.buildEditedBlob();
+      const file = new File([blob], this.file.filename, { type: blob.type || this.file.mimeType });
+      this.saveFile.emit(file);
+    } catch (error) {
+      console.error(error);
+      this.message.emit({ type: 'error', text: 'Не удалось подготовить изменения файла.' });
+    }
   }
 
   asPdf(page: FilePreviewPage | null): PdfPageData | null {
     return (page?.data as PdfPageData) ?? null;
   }
 
-  asSheet(page: FilePreviewPage | null): SpreadsheetPageData | null {
-    return (page?.data as SpreadsheetPageData) ?? null;
-  }
 
   asBinary(page: FilePreviewPage | null): BinaryPageData | null {
     return (page?.data as BinaryPageData) ?? null;

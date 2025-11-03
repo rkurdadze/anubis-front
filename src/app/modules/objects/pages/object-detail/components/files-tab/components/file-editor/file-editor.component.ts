@@ -16,7 +16,7 @@ import {
   HtmlPageData,
   TextPageData,
   PdfPageData
-} from '../../helpers/file-preview.helpers';
+} from '../file-preview/file-preview.helpers';
 
 @Component({
   selector: 'app-file-editor',

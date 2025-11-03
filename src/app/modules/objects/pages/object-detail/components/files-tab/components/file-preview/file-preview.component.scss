@@ -39,48 +39,45 @@
     }
   }
 
-  /* 🔹 Основная область предпросмотра */
   .preview-stage {
     position: relative;
     width: 100%;
-    max-width: 560px; /* 🔹 ограничение ширины */
-    max-height: 560px; /* 🔹 ограничение высоты */
-    aspect-ratio: 1 / 1; /* гарантирует квадратное соотношение сторон */
-    overflow: hidden;
+    height: 100%;
+    min-height: 560px;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     background: #fafafa;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 0.5rem;
-    box-sizing: border-box;
-    margin: 0 auto;
   }
 
-  /* 🔹 Canvas не растёт — только вписывает содержимое */
   .preview-stage__canvas {
-    position: relative;
     width: 100%;
     height: 100%;
-    max-width: 560px;
-    max-height: 560px;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    flex-shrink: 0;
+    flex-grow: 1;
   }
 
-  /* 🔹 Масштабирование изображения пропорционально в пределах 560x560 */
+  /* 🖼️ изображение вписывается внутрь canvas, не растягивает его */
   .preview-stage__image {
-    width: 100%;
-    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
     display: block;
     border-radius: 4px;
-    transition: transform 0.2s ease-in-out;
-    background-color: #fff;
+    background: #fff;
+    user-select: none;
   }
+
 
   /* 🔹 PDF-фрейм — вписывается без роста canvas */
   .preview-stage__frame {
@@ -195,9 +192,10 @@
     }
 
     ::ng-deep .pdf-highlight {
-      background: rgb(255, 0, 174);
-      color: rgb(255, 0, 174);
+      background: rgba(255, 209, 0, 0.51);
+      //color: rgb(255, 0, 174);
       border-radius: 2px;
+      border: 1px rgba(255, 209, 0, 0.51);
       padding: 0;
     }
 

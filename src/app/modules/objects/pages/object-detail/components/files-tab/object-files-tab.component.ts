@@ -26,7 +26,7 @@ import { UiMessage } from '../../../../../../shared/services/ui-message.service'
 import {
   FilePreviewComponent
 } from './components/file-preview/file-preview.component';
-import { determinePreviewKind, getFileIconClass, formatFileSize } from './helpers/file-preview.helpers';
+import { determinePreviewKind, getFileIconClass, formatFileSize } from './components/file-preview/file-preview.helpers';
 
 @Component({
   selector: 'app-object-files-tab',
