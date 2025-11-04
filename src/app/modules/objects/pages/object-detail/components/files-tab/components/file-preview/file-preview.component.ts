@@ -270,16 +270,37 @@ export class FilePreviewComponent implements OnInit, OnChanges, AfterViewInit, O
     if (!this.state.data) {
       return;
     }
-    const currentZoom =
-      typeof this.state.data.zoom === 'number' ? this.state.data.zoom : this.state.data.fitZoom;
+    // For PDF files, do nothing
+    if (this.state.data.kind === 'pdf') {
+      return;
+    }
+    // Only allow zoom for images
+    if (this.state.data.kind !== 'image') {
+      this.resetZoom();
+      return;
+    }
 
-    const nextZoom = Math.min(4, Math.max(0.25, +(currentZoom + delta).toFixed(2)));
+    // При первом изменении зума: если был fit, начать масштабировать от 1
+    let currentZoom: number;
+    const isCurrentlyFit = typeof this.state.data.zoom !== 'number' || this.state.data.zoom === this.state.data.fitZoom;
+    if (!this.manualZoom && isCurrentlyFit) {
+      // Сбросить zoom на 1 перед применением delta
+      currentZoom = 1;
+    } else {
+      currentZoom = typeof this.state.data.zoom === 'number' ? this.state.data.zoom : this.state.data.fitZoom;
+    }
+
+    let nextZoom = +(currentZoom + delta);
+    nextZoom = Math.min(4, Math.max(0.25, +nextZoom.toFixed(2)));
     this.manualZoom = true;
     this.updateZoom(nextZoom);
   }
 
   resetZoom(): void {
     if (!this.state.data) {
+      return;
+    }
+    if (this.state.data.kind === 'pdf') {
       return;
     }
     this.manualZoom = false;
