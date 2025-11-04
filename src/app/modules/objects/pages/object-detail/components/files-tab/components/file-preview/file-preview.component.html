@@ -131,16 +131,23 @@
 
               <div *ngSwitchCase="'pdf'" class="preview-stage__pdf">
                 <ngx-extended-pdf-viewer
+                  #pdfViewer
                   *ngIf="pdfViewerSrc"
                   [src]="pdfViewerSrc"
                   [textLayer]="true"
-                  [showHandToolButton]="true"
+                  [showHandToolButton]="false"
                   [showDownloadButton]="false"
                   [showPrintButton]="false"
+                  [showRotateButton]="false"
+
+                  [showSidebarButton]="false"
+                  [showPresentationModeButton]="false"
+                  [showOpenFileButton]="false"
+                  [showPropertiesButton]="false"
+
                   [zoom]="state.data.zoom"
                   (pagesLoaded)="onPdfLoaded()"
                   (textLayerRendered)="onTextLayerRendered()"
-                  #pdfViewer
                 ></ngx-extended-pdf-viewer>
               </div>
 

@@ -19,8 +19,9 @@
     "@angular/platform-browser-dynamic": "^18.2.0",
     "@angular/router": "^18.2.0",
     "bootstrap": "^5.3.8",
-    "ngx-extended-pdf-viewer": "^25.6.0-alpha.3",
+    "ngx-extended-pdf-viewer": "^25.5.0",
     "pako": "^2.1.0",
+    "pdfjs-dist": "^5.4.394",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.14.10"

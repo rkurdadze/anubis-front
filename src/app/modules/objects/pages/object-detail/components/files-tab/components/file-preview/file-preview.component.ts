@@ -11,7 +11,7 @@ import {
   Output,
   SimpleChanges,
   ViewChild,
-  inject
+  inject, OnInit
 } from '@angular/core';
 import {
   AsyncPipe,
@@ -42,22 +42,21 @@ import {
 } from './file-preview.helpers';
 import { FileEditorComponent } from '../file-editor/file-editor.component';
 import {NgxExtendedPdfViewerComponent, NgxExtendedPdfViewerModule} from 'ngx-extended-pdf-viewer';
+import {window} from 'rxjs';
+import { pdfDefaultOptions } from 'ngx-extended-pdf-viewer';
 
 
 @Component({
   selector: 'app-file-preview',
   standalone: true,
   imports: [
-    AsyncPipe,
     DecimalPipe,
     FormsModule,
     NgClass,
     NgFor,
     NgIf,
-    NgStyle,
     NgSwitch,
     NgSwitchCase,
-    NgSwitchDefault,
     FileEditorComponent,
     NgxExtendedPdfViewerModule
   ],
@@ -65,7 +64,7 @@ import {NgxExtendedPdfViewerComponent, NgxExtendedPdfViewerModule} from 'ngx-ext
   styleUrls: ['./file-preview.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy {
+export class FilePreviewComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   /**
    * Жёсткий максимум области предпросмотра — 560x560 px.
    * CSS уже ограничивает контейнер, но дополнительно страхуем вычисление fitZoom
@@ -103,6 +102,11 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   private resizeObserver?: ResizeObserver;
   pdfSrc?: string;
 
+  ngOnInit(): void {
+    pdfDefaultOptions.annotationEditorMode = 0; // 🔹 Полностью выключает аннотации
+    pdfDefaultOptions.enableScripting = false;  // 🔹 Отключает JS-скрипты и интерактивность
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['file'] || changes['blob']) {
       this.resetState();
@@ -126,7 +130,7 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
     this.resizeObserver?.disconnect();
     const url = this.state.data?.objectUrl;
     if (url) {
-      window.URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
     }
   }
 
@@ -134,51 +138,6 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   get pdfViewerSrc(): string | undefined {
     return this.pdfSrc;
   }
-
-
-  // onPdfLoaded(): void {
-  //   const pdfViewer = (this.pdfViewer as any)?.pdfViewer;
-  //   if (!pdfViewer?.pdfDocument) return;
-  //
-  //   const container = this.stageRef?.nativeElement;
-  //   const data = this.state.data;
-  //   if (container && data && data.kind === 'pdf') {
-  //     pdfViewer.pdfDocument.getPage(1).then((page: any) => {
-  //       const viewport = page.getViewport({ scale: 1 });
-  //       const fitZoom = Math.min(
-  //         container.clientWidth / viewport.width,
-  //         container.clientHeight / viewport.height
-  //       );
-  //
-  //       // ✅ Полностью совместимый объект типа FilePreviewData
-  //       const newData = {
-  //         ...data,
-  //         fitZoom,
-  //         zoom: fitZoom,
-  //         resourceUrl: this.sanitizer.bypassSecurityTrustResourceUrl(
-  //           buildPdfViewerUrl(data.baseUrl!, data.currentPage, fitZoom)
-  //         )
-  //       };
-  //
-  //       this.state = {
-  //         ...this.state,
-  //         data: newData
-  //       };
-  //       this.cdr.markForCheck();
-  //     });
-  //   }
-  //
-  //   // Подсветка текста оставляем как было
-  //   setTimeout(() => {
-  //     const spans = document.querySelectorAll('.textLayer span') as NodeListOf<HTMLElement>;
-  //     spans.forEach(span => {
-  //       const text = span.textContent?.trim();
-  //       if (text?.includes('ტესტ')) {
-  //         span.innerHTML = span.innerHTML.replaceAll('ტესტ', '<mark class="pdf-highlight">ტესტ</mark>');
-  //       }
-  //     });
-  //   }, 500);
-  // }
 
 
   onPdfLoaded(): void {
@@ -213,13 +172,17 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
 
 
   onTextLayerRendered(): void {
-    const spans = document.querySelectorAll('.textLayer span') as NodeListOf<HTMLElement>;
-    spans.forEach(span => {
-      const text = span.textContent?.trim();
-      if (text?.includes('ტესტ')) {
-        span.innerHTML = span.innerHTML.replaceAll('ტესტ', '<mark class="pdf-highlight">ტესტ</mark>');
-      }
-    });
+    try {
+      const spans = document.querySelectorAll('.textLayer span') as NodeListOf<HTMLElement>;
+      spans.forEach(span => {
+        const text = span.textContent?.trim();
+        if (text?.includes('საგა')) {
+          span.innerHTML = span.innerHTML.replaceAll('საგა', '<mark class="pdf-highlight">საგა</mark>');
+        }
+      });
+    } catch (e) {
+      console.warn('⚠️ PDF textLayer render skipped:', e);
+    }
   }
 
 
@@ -486,7 +449,7 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   }
 
   private async loadImagePreview(file: ObjectFile, blob: Blob): Promise<void> {
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const size = await this.readImageSize(url);
     const page: FilePreviewPage = {
       label: 'Изображение',
@@ -514,7 +477,7 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
 
   private async loadPdfPreview(file: ObjectFile, blob: Blob): Promise<void> {
     // 1️⃣ создаём blob-URL без sanitizer
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     this.pdfSrc = url;
 
     // 2️⃣ сохраняем состояние предпросмотра
@@ -541,7 +504,7 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
 
 
   private async loadBinaryPreview(file: ObjectFile, blob: Blob): Promise<void> {
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     this.state = {
       ...this.state,
       loading: false,
@@ -672,4 +635,6 @@ export class FilePreviewComponent implements OnChanges, AfterViewInit, OnDestroy
   asBinary(page: FilePreviewPage | null): BinaryPageData | null {
     return (page?.data as BinaryPageData) ?? null;
   }
+
+
 }
