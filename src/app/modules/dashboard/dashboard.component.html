@@ -42,7 +42,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let obj of recentObjects$ | async">
+                <tr *ngFor="let obj of (recentObjects$ | async)?.content">
                   <td class="fw-semibold">{{ obj.name }}</td>
                   <td>#{{ obj.typeId }}</td>
                   <td>
@@ -54,7 +54,7 @@
                     <ng-template #unknown><span class="text-muted">нет данных</span></ng-template>
                   </td>
                 </tr>
-                <tr *ngIf="(recentObjects$ | async)?.length === 0">
+                <tr *ngIf="((recentObjects$ | async)?.content?.length ?? 0) === 0">
                   <td colspan="4" class="text-center text-muted py-4">Нет объектов для отображения</td>
                 </tr>
               </tbody>

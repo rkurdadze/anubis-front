@@ -2,8 +2,8 @@ import { AsyncPipe, DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
-import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'rxjs/operators';
+import {BehaviorSubject, Subject, combineLatest, of, Observable} from 'rxjs';
+import {catchError, map, shareReplay, startWith, switchMap, takeUntil, tap} from 'rxjs/operators';
 
 import { ObjectApi } from '../../../../core/api/object.api';
 import { ObjectTypeApi } from '../../../../core/api/object-type.api';
@@ -12,6 +12,7 @@ import { RepositoryObject, RepositoryObjectRequest } from '../../../../core/mode
 import { ObjectClass } from '../../../../core/models/class.model';
 import { ObjectType } from '../../../../core/models/object-type.model';
 import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import {Page} from '../../../../core/models/page.model';
 
 interface ObjectsListItem extends RepositoryObject {
   typeName?: string;
@@ -33,7 +34,7 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   private readonly classApi = inject(ClassApi);
   private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
   private readonly destroy$ = new Subject<void>();
-  private readonly reload$ = new BehaviorSubject<void>(undefined);
+  private readonly reload$ = new BehaviorSubject<number>(0);
 
   readonly filterForm = this.fb.group({
     search: [''],
@@ -80,54 +81,49 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     map(([classes, typeId]) => (typeId ? classes.filter(cls => cls.objectTypeId === typeId) : classes))
   );
 
-  readonly objects$ = this.reload$.pipe(
-    switchMap(() =>
-      this.objectApi.list().pipe(
-        catchError(() => {
-          this.showMessage('error', 'Не удалось загрузить список объектов.');
-          return of<RepositoryObject[]>([]);
-        })
-      )
-    ),
+  readonly objectsPage$ = combineLatest([
+    this.reload$,
+    this.filterForm.valueChanges.pipe(startWith(this.filterForm.value))
+  ]).pipe(
+    switchMap(([_, filters]) => {
+      console.log('🔍 Filters applied:', filters);
+      console.log('📡 API Request:', this.objectApi['baseUrl'], { page: this.currentPage, size: this.pageSize, filters });
+      return this.objectApi.list(this.currentPage, this.pageSize, filters);
+    }),
+    tap(response => {
+      this.totalPages = response.page?.totalPages ?? 1;
+      this.isPerformingAction = false;
+    }),
     shareReplay(1)
   );
 
-  readonly filteredObjects$ = combineLatest([
-    this.objects$,
-    this.filterForm.valueChanges.pipe(startWith(this.filterForm.value)),
-    this.objectTypes$,
-    this.classes$
-  ]).pipe(
-    map(([objects, filters, types, classes]) => {
-      const typeMap = new Map<number, ObjectType>(types.map(type => [type.id, type]));
-      const classMap = new Map<number, ObjectClass>(classes.map(cls => [cls.id, cls]));
-
-      return objects
-        .filter(object => {
-          if (!filters) {
-            return true;
-          }
-
-          const searchTerm = filters.search?.trim().toLowerCase() ?? '';
-          const matchesSearch = !searchTerm || object.name.toLowerCase().includes(searchTerm) || `${object.id}`.includes(searchTerm);
-
-          const matchesType = !filters.typeId || object.typeId === filters.typeId;
-          const matchesClass = !filters.classId || object.classId === filters.classId;
-          const matchesDeleted = filters.showDeleted || !object.isDeleted;
-
-          return matchesSearch && matchesType && matchesClass && matchesDeleted;
-        })
-        .map<ObjectsListItem>(object => ({
-          ...object,
-          typeName: typeMap.get(object.typeId)?.name ?? '—',
-          className: object.classId ? classMap.get(object.classId)?.name ?? '—' : '—'
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-    })
-  );
-
   isCreatePanelOpen = false;
+  // 🔹 Текущая страница и размер
+  currentPage = 0;
+  pageSize = 20;
+  // 🔹 Общее число страниц
+  totalPages = 1;
+
+  // 🔹 Контроль загрузки
   isPerformingAction = false;
+
+
+  loadPage(page: number): void {
+    if (page < 0 || (this.totalPages && page >= this.totalPages)) {
+      return; // за пределы не выходим
+    }
+    this.currentPage = page;
+    this.isPerformingAction = true;
+    this.reload$.next(page); // ⚙️ передаём значение для обновления стрима
+  }
+
+  nextPage(): void {
+    this.loadPage(this.currentPage + 1);
+  }
+
+  previousPage(): void {
+    this.loadPage(this.currentPage - 1);
+  }
 
   ngOnInit(): void {
     this.filterForm
@@ -139,10 +135,16 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
 
     this.createForm
       .get('typeId')!
-      .valueChanges.pipe(takeUntil(this.destroy$))
+      .valueChanges.pipe(
+        startWith(this.createForm.get('typeId')!.value),
+        takeUntil(this.destroy$)
+      )
       .subscribe(() => {
         this.createForm.get('classId')!.setValue(null);
       });
+
+    // 🔹 Загружаем первую страницу объектов при открытии
+    this.loadPage(0);
   }
 
   ngOnDestroy(): void {
@@ -159,7 +161,7 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   }
 
   refresh(): void {
-    this.reload$.next();
+    this.reload$.next(this.currentPage);
   }
 
   createObject(): void {

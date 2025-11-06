@@ -2,7 +2,8 @@
   <header class="page-header">
     <div class="page-header__title">
       <h1 class="h3 mb-1">Объекты хранилища</h1>
-      <p class="text-muted mb-0 page-header__description">Управляйте объектами, их типами и состояниями. Здесь доступны фильтры, быстрые действия и создание новых записей.</p>
+      <p class="text-muted mb-0 page-header__description">Управляйте объектами, их типами и состояниями. Здесь доступны
+        фильтры, быстрые действия и создание новых записей.</p>
     </div>
     <div class="page-header__actions">
       <button type="button" class="btn btn-outline-secondary" (click)="refresh()" [disabled]="isPerformingAction">
@@ -16,7 +17,8 @@
     </div>
   </header>
 
-  <div *ngIf="message$ | async as message" class="alert" [ngClass]="{'alert-success': message.type === 'success', 'alert-danger': message.type === 'error'}">
+  <div *ngIf="message$ | async as message" class="alert"
+       [ngClass]="{'alert-success': message.type === 'success', 'alert-danger': message.type === 'error'}">
     <div class="d-flex justify-content-between align-items-start">
       <span>{{ message.text }}</span>
       <button type="button" class="btn-close" aria-label="Закрыть" (click)="dismissMessage()"></button>
@@ -56,7 +58,8 @@
         </div>
         <div class="col-md-2">
           <div class="form-check form-switch mt-md-4 pt-md-2">
-            <input class="form-check-input" type="checkbox" role="switch" id="objects-deleted" formControlName="showDeleted" />
+            <input class="form-check-input" type="checkbox" role="switch" id="objects-deleted"
+                   formControlName="showDeleted"/>
             <label class="form-check-label" for="objects-deleted">Показывать удалённые</label>
           </div>
         </div>
@@ -125,95 +128,121 @@
     </div>
   </div>
 
-  <div class="card border-0 anubis-shadow">
-    <ng-container *ngIf="filteredObjects$ | async as objects">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <span class="text-muted">Найдено объектов: <strong>{{ objects.length }}</strong></span>
-        <span class="text-muted small">Сортировка по названию A→Я</span>
-      </div>
-      <div class="card-body p-0">
-        <ng-container *ngIf="objects.length; else emptyState">
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead>
-                <tr>
-                  <th scope="col" class="text-nowrap">ID</th>
-                  <th scope="col">Название</th>
-                  <th scope="col" class="text-nowrap">Тип</th>
-                  <th scope="col" class="text-nowrap">Класс</th>
-                  <th scope="col" class="text-nowrap">Создан</th>
-                  <th scope="col" class="text-nowrap">Статус</th>
-                  <th scope="col" class="text-end">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  *ngFor="let object of objects; trackBy: trackByObjectId"
-                  [ngClass]="{'table-danger': object.isDeleted}"
+  <ng-container *ngIf="objectsPage$ | async as page">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="text-muted">
+      Найдено объектов:
+      <strong>{{ page.page.totalElements }}</strong>
+      <span class="small text-muted ms-2">
+        (страница {{ page.page.number + 1 }} из {{ page.page.totalPages }})
+      </span>
+    </span>
+    </div>
+    <div class="card-body p-0">
+      <ng-container *ngIf="page.content.length; else emptyState">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+            <tr>
+              <th scope="col" class="text-nowrap">ID</th>
+              <th scope="col">Название</th>
+              <th scope="col" class="text-nowrap">Тип</th>
+              <th scope="col" class="text-nowrap">Класс</th>
+              <th scope="col" class="text-nowrap">Создан</th>
+              <th scope="col" class="text-nowrap">Статус</th>
+              <th scope="col" class="text-end">Действия</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr
+              *ngFor="let object of page.content; trackBy: trackByObjectId"
+              [ngClass]="{'table-danger': object.isDeleted}"
+            >
+              <td class="text-muted fw-semibold">#{{ object.id }}</td>
+              <td class="fw-semibold position-relative">
+                <a
+                  class="stretched-link text-reset text-decoration-none"
+                  [routerLink]="['/objects', object.id]"
                 >
-                  <td class="text-muted fw-semibold">#{{ object.id }}</td>
-                  <td class="fw-semibold position-relative">
-                    <a
-                      class="stretched-link text-reset text-decoration-none"
-                      [routerLink]="['/objects', object.id]"
-                    >
-                      {{ object.name }}
-                    </a>
-                  </td>
-                  <td>{{ object.typeName }}</td>
-                  <td>{{ object.className }}</td>
-                  <td>
-                    <span *ngIf="object.createdAt; else noDate">
-                      {{ object.createdAt | date: 'dd.MM.yyyy HH:mm' }}
-                    </span>
-                    <ng-template #noDate><span class="text-muted">—</span></ng-template>
-                    <span *ngIf="object.createdBy" class="d-block text-muted small mt-1">Автор: {{ object.createdBy }}</span>
-                  </td>
-                  <td>
-                    <span class="badge" [ngClass]="object.isDeleted ? 'bg-secondary' : 'bg-success'">
-                      {{ object.isDeleted ? 'Удалён' : 'Активен' }}
-                    </span>
-                  </td>
-                  <td class="text-end">
-                    <div class="action-buttons">
-                      <button
-                        type="button"
-                        class="btn btn-outline-primary btn-icon"
-                        (click)="cloneObject(object)"
-                        [disabled]="isPerformingAction"
-                      >
-                        <i class="fa-solid fa-copy"></i>
-                        <span class="visually-hidden">Дублировать</span>
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-outline-warning btn-icon"
-                        (click)="softDelete(object)"
-                        [disabled]="isPerformingAction || object.isDeleted"
-                        title="Мягкое удаление"
-                      >
-                        <i class="fa-solid fa-box-archive"></i>
-                        <span class="visually-hidden">Архивировать</span>
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-outline-danger btn-icon"
-                        (click)="hardDelete(object)"
-                        [disabled]="isPerformingAction"
-                      >
-                        <i class="fa-solid fa-trash"></i>
-                        <span class="visually-hidden">Удалить</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </ng-container>
+                  {{ object.name }}
+                </a>
+              </td>
+              <td>{{ object.typeName }}</td>
+              <td>{{ object.className }}</td>
+              <td>
+                <span *ngIf="object.createdAt; else noDate">
+                  {{ object.createdAt | date: 'dd.MM.yyyy HH:mm' }}
+                </span>
+                <ng-template #noDate><span class="text-muted">—</span></ng-template>
+                <span *ngIf="object.createdBy"
+                      class="d-block text-muted small mt-1">Автор: {{ object.createdBy }}</span>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="object.isDeleted ? 'bg-secondary' : 'bg-success'">
+                  {{ object.isDeleted ? 'Удалён' : 'Активен' }}
+                </span>
+              </td>
+              <td class="text-end">
+                <div class="action-buttons">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-icon"
+                    (click)="cloneObject(object)"
+                    [disabled]="isPerformingAction"
+                  >
+                    <i class="fa-solid fa-copy"></i>
+                    <span class="visually-hidden">Дублировать</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-warning btn-icon"
+                    (click)="softDelete(object)"
+                    [disabled]="isPerformingAction || object.isDeleted"
+                    title="Мягкое удаление"
+                  >
+                    <i class="fa-solid fa-box-archive"></i>
+                    <span class="visually-hidden">Архивировать</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-icon"
+                    (click)="hardDelete(object)"
+                    [disabled]="isPerformingAction"
+                  >
+                    <i class="fa-solid fa-trash"></i>
+                    <span class="visually-hidden">Удалить</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
+
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          (click)="previousPage()"
+          [disabled]="page.page.number === 0"
+        >
+          <i class="fa-solid fa-arrow-left me-1"></i> Назад
+        </button>
+        <span class="text-muted small">
+        Страница {{ page.page.number + 1 }} из {{ page.page.totalPages }}
+      </span>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          (click)="nextPage()"
+          [disabled]="page.page.number + 1 >= page.page.totalPages"
+        >
+          Далее <i class="fa-solid fa-arrow-right ms-1"></i>
+        </button>
       </div>
-    </ng-container>
-  </div>
+    </div>
+  </ng-container>
 
   <ng-template #emptyState>
     <div class="text-center py-5">

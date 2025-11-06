@@ -11,6 +11,10 @@ export interface RepositoryObject {
   isDeleted?: boolean;
   createdAt?: string;
   createdBy?: string;
+
+  // для отображения в списке
+  typeName?: string;
+  className?: string;
 }
 
 export interface RepositoryObjectRequest {
