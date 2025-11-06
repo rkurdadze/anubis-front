@@ -4,7 +4,8 @@ import {
   Component,
   OnDestroy,
   OnInit,
-  inject
+  inject,
+  ChangeDetectorRef
 } from '@angular/core';
 import {
   FormArray,
@@ -16,7 +17,7 @@ import {
   Validators
 } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import {BehaviorSubject, Observable, Subject, combineLatest, of, filter, pairwise} from 'rxjs';
+import {BehaviorSubject, Observable, Subject, combineLatest, of, filter, pairwise, from, mergeMap} from 'rxjs';
 import {
   catchError,
   map,
@@ -48,6 +49,8 @@ import { ObjectVersionAudit } from '../../../../core/models/object-version-audit
 import { PropertyDataType } from '../../../../core/models/property-data-type.enum';
 import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
 import { ObjectFilesTabComponent } from './components/files-tab/object-files-tab.component';
+import {ValueListApi} from '../../../../core/api/value-list.api';
+import {ValueListItem} from '../../../../core/models/value-list.model';
 
 interface VersionWithAudit {
   version: ObjectVersion | null;
@@ -71,7 +74,6 @@ type PropertyFormGroup = FormGroup<{
   imports: [
     AsyncPipe,
     DatePipe,
-    DecimalPipe,
     NgIf,
     NgFor,
     NgClass,
@@ -98,7 +100,10 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
   private readonly objectLinkApi = inject(ObjectLinkApi);
   private readonly linkRoleApi = inject(LinkRoleApi);
+  private readonly valueListApi = inject(ValueListApi);
   private readonly uiMessages = inject(UiMessageService).create();
+
+  private readonly cdRef = inject(ChangeDetectorRef);
 
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
@@ -113,6 +118,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
 
 
   private propertyDefinitions: PropertyDefinition[] = [];
+  private valueListCache = new Map<number, ValueListItem[]>();
+
   private propertyDefinitionMap = new Map<number, PropertyDefinition>();
   private classesCache: ObjectClass[] = [];
   private typesCache: ObjectType[] = [];
@@ -152,11 +159,11 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       Number.isNaN(objectId)
         ? of<RepositoryObject | null>(null)
         : this.objectApi.get(objectId).pipe(
-            catchError(() => {
-              this.showMessage('error', 'Не удалось загрузить объект.');
-              return of<RepositoryObject | null>(null);
-            })
-          )
+          catchError(() => {
+            this.showMessage('error', 'Не удалось загрузить объект.');
+            return of<RepositoryObject | null>(null);
+          })
+        )
     ),
     tap(object => {
       if (object) {
@@ -202,12 +209,12 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       Number.isNaN(objectId)
         ? of<ObjectVersion[]>([])
         : this.objectVersionApi.listByObject(objectId).pipe(
-            map(versions => versions.slice().sort((a, b) => b.versionNum - a.versionNum)),
-            catchError(() => {
-              this.showMessage('error', 'Не удалось загрузить версии объекта.');
-              return of<ObjectVersion[]>([]);
-            })
-          )
+          map(versions => versions.slice().sort((a, b) => b.versionNum - a.versionNum)),
+          catchError(() => {
+            this.showMessage('error', 'Не удалось загрузить версии объекта.');
+            return of<ObjectVersion[]>([]);
+          })
+        )
     ),
     tap(versions => {
       const current = this.selectedVersionSubject.value;
@@ -298,6 +305,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     shareReplay(1)
   );
 
+
   readonly propertyDefinitions$ = this.propertyDefinitionApi.list(0, 500).pipe(
     map(response => response.content ?? []),
     tap(defs => {
@@ -310,6 +318,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     }),
     shareReplay(1)
   );
+
 
   readonly properties$ = combineLatest([this.selectedVersionId$, this.propertiesReload$]).pipe(
     switchMap(([versionId]) => {
@@ -332,11 +341,11 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       Number.isNaN(objectId)
         ? of<ObjectLink[]>([])
         : this.objectLinkApi.get(objectId).pipe(
-            catchError(() => {
-              this.showMessage('error', 'Не удалось загрузить связи объекта.');
-              return of<ObjectLink[]>([]);
-            })
-          )
+          catchError(() => {
+            this.showMessage('error', 'Не удалось загрузить связи объекта.');
+            return of<ObjectLink[]>([]);
+          })
+        )
     ),
     shareReplay(1)
   );
@@ -360,9 +369,16 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private originalObjectData: any;
 
   ngOnInit(): void {
-    combineLatest([this.propertyDefinitions$, this.properties$])
-      .pipe(takeUntil(this.destroy$))
-      .subscribe();
+    this.propertyDefinitions$
+      .pipe(
+        switchMap(defs => this.waitForValueLists(defs)), // ⬅️ ждём preloadValueLists
+        switchMap(() => this.properties$),              // ⬅️ теперь загружаем свойства
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => {
+        this.cdRef.detectChanges();
+      });
+
 
     this.objectForm
       .get('typeId')!
@@ -409,6 +425,41 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
     this.uiMessages.destroy();
   }
+
+
+  /**
+   * ⏳ Ждёт завершения предварительной загрузки всех справочников перед тем, как продолжить.
+   */
+  private waitForValueLists(definitions: PropertyDefinition[]): Observable<void> {
+    const uniqueIds = Array.from(
+      new Set(definitions.map(d => d.valueListId).filter((id): id is number => !!id))
+    );
+
+    const idsToLoad = uniqueIds.filter(id => !this.valueListCache.has(id));
+    if (!idsToLoad.length) {
+      console.log('ℹ️ [waitForValueLists] Все справочники уже в кеше.');
+      return of(void 0);
+    }
+
+    console.log('🕐 [waitForValueLists] Загружаем справочники перед показом свойств:', idsToLoad);
+
+    const requests$ = idsToLoad.map(id =>
+      this.valueListApi.listItems(id).pipe(
+        tap(items => {
+          // console.log(`✅ [ValueListApi] Получено ${items.length} элементов для списка #${id}`);
+          this.valueListCache.set(id, items);
+        }),
+        catchError(err => {
+          console.error(`❌ [ValueListApi] Ошибка загрузки списка #${id}:`, err);
+          this.showMessage('error', `Не удалось загрузить элементы справочника #${id}`);
+          return of<ValueListItem[]>([]);
+        })
+      )
+    );
+
+    return combineLatest(requests$).pipe(map(() => void 0));
+  }
+
 
   initObjectForm(object: any): void {
     this.objectForm = this.fb.group({
@@ -509,21 +560,18 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .map(ctrl => ctrl.get('propertyDefId')?.value)
       .filter(v => v !== null);
 
-    const availableDefs = (this.propertyDefinitions$ as Observable<any[]>).pipe(
-      map(defs => defs.filter(d => !usedIds.includes(d.id)))
-    );
+    const availableDefs = this.propertyDefinitions.filter(d => !usedIds.includes(d.id));
 
-    availableDefs.subscribe(defs => {
-      if (defs.length === 0) {
-        window.alert('Все свойства уже выбраны.');
-        return;
-      }
-      const group = this.fb.group({
-        propertyDefId: [defs[0].id, Validators.required],
-        value: ['']
-      });
-      propertiesArray.push(group);
+    if (availableDefs.length === 0) {
+      this.showMessage('info', 'Все свойства уже выбраны.');
+      return;
+    }
+
+    const group = this.fb.group({
+      propertyDefId: [null, Validators.required],
+      value: ['']
     });
+    propertiesArray.push(group);
   }
 
 // Добавим helper для проверки, можно ли выбрать конкретное свойство:
@@ -696,10 +744,20 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private rebuildPropertiesForm(values: PropertyValue[]): void {
     this.propertiesForm.clear();
     values.forEach(value => {
+      const def = this.propertyDefinitionMap.get(value.propertyDefId);
+      let parsedValue: any = this.stringifyPropertyValue(value.propertyDefId, value.value);
+
+      // 🔹 Если это ValueList или MultiValueList — конвертируем в числа
+      if (def?.dataType === PropertyDataType.VALUELIST && parsedValue) {
+        parsedValue = Number(parsedValue);
+      } else if (def?.dataType === PropertyDataType.MULTI_VALUELIST && Array.isArray(value.value)) {
+        parsedValue = value.value.map((v: any) => Number(v));
+      }
+
       this.propertiesForm.push(
         this.fb.group({
           propertyDefId: this.fb.control<number | null>(value.propertyDefId, { validators: [Validators.required] }),
-          value: this.fb.nonNullable.control(this.stringifyPropertyValue(value.propertyDefId, value.value))
+          value: this.fb.control(parsedValue)
         })
       );
     });
@@ -728,12 +786,20 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  private parsePropertyValue(propertyDefId: number, rawValue: string): unknown {
+  private parsePropertyValue(propertyDefId: number, rawValue: any): unknown {
     const def = this.propertyDefinitionMap.get(propertyDefId);
     if (!def) {
       return rawValue;
     }
-    const trimmed = rawValue?.trim() ?? '';
+
+    // 🔹 Безопасное преобразование значения (чтобы не вызывать trim() у числа/массива)
+    const trimmed =
+      typeof rawValue === 'string'
+        ? rawValue.trim()
+        : rawValue === undefined || rawValue === null
+          ? ''
+          : rawValue;
+
     switch (def.dataType) {
       case PropertyDataType.BOOLEAN:
         return trimmed === 'true' || trimmed === '1' || trimmed === 'on';
@@ -742,7 +808,9 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       case PropertyDataType.FLOAT:
         return trimmed ? Number.parseFloat(trimmed) : null;
       case PropertyDataType.MULTI_VALUELIST:
-        return trimmed ? trimmed.split(',').map(item => item.trim()).filter(Boolean) : [];
+        return typeof trimmed === 'string'
+          ? trimmed.split(',').map(item => item.trim()).filter(Boolean)
+          : [];
       case PropertyDataType.DATE:
         return trimmed || null;
       default:
@@ -786,6 +854,92 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
 
     return !!(vault && vault.isActive);
   }
+
+
+  /**
+   * 🔹 Предварительно загружает все справочники (Value Lists), указанные в PropertyDefinition.
+   * После загрузки всех — автоматически перезагружает свойства, чтобы обновить форму.
+   * Добавлено логирование всех вызовов API.
+   */
+  private preloadValueLists(definitions: PropertyDefinition[]): void {
+    const uniqueIds = Array.from(
+      new Set(
+        definitions
+          .map(d => d.valueListId)
+          .filter((id): id is number => !!id)
+      )
+    );
+
+    console.log('🟢 [preloadValueLists] Найдено справочников:', uniqueIds);
+
+    const idsToLoad = uniqueIds.filter(id => !this.valueListCache.has(id));
+    if (!idsToLoad.length) {
+      console.log('ℹ️ [preloadValueLists] Все справочники уже в кеше, ничего не загружаем.');
+      return;
+    }
+
+    console.log('🟡 [preloadValueLists] Загружаем справочники с ID:', idsToLoad);
+
+    const requests$ = idsToLoad.map(id =>
+      this.valueListApi.listItems(id).pipe(
+        tap(items => {
+          // console.log(`✅ [ValueListApi] Получено ${items.length} элементов для списка #${id}`);
+          this.valueListCache.set(id, items);
+        }),
+        catchError(err => {
+          console.error(`❌ [ValueListApi] Ошибка загрузки списка #${id}:`, err);
+          this.showMessage('error', `Не удалось загрузить элементы справочника #${id}`);
+          return of<ValueListItem[]>([]);
+        })
+      )
+    );
+
+    combineLatest(requests$)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        console.log('🔁 [preloadValueLists] Все справочники загружены → обновляем свойства');
+        this.propertiesReload$.next();
+      });
+  }
+
+
+  /**
+   * 🔹 Возвращает элементы справочника для указанного определения свойства.
+   * Если справочник не загружен — запускает подгрузку в фоне (с логами).
+   */
+  getValueListItems(definition: PropertyDefinition): ValueListItem[] {
+    if (!definition?.valueListId) {
+      console.warn('⚠️ [getValueListItems] Свойство без valueListId:', definition);
+      return [];
+    }
+
+    const valueListId = definition.valueListId;
+
+    // Если справочник уже в кеше
+    if (this.valueListCache.has(valueListId)) {
+      // console.log(`🟢 [getValueListItems] Используем кеш для списка #${valueListId}`);
+      return this.valueListCache.get(valueListId)!;
+    }
+
+    // Если справочник не загружен — загружаем в фоне
+    console.log(`🟠 [getValueListItems] Кеш отсутствует → загружаем список #${valueListId}`);
+    this.valueListApi.listItems(valueListId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: items => {
+          console.log(`✅ [ValueListApi] Фоновая загрузка списка #${valueListId}: ${items.length} элементов`);
+          this.valueListCache.set(valueListId, items);
+          this.propertiesReload$.next();
+        },
+        error: err => {
+          console.error(`❌ [ValueListApi] Ошибка при загрузке списка #${valueListId}:`, err);
+          this.showMessage('error', `Не удалось загрузить элементы списка значений #${valueListId}`);
+        }
+      });
+
+    return [];
+  }
+
 
 
 

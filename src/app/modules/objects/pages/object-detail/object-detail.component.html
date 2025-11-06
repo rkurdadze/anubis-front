@@ -238,8 +238,21 @@
                               </select>
                               <input *ngSwitchCase="'DATE'" type="datetime-local" class="form-control"
                                      formControlName="value"/>
-                              <textarea *ngSwitchCase="'MULTI_VALUELIST'" class="form-control" rows="2"
-                                        formControlName="value" placeholder="Значения через запятую"></textarea>
+                              <!-- 🔹 Value List (Single Selection) -->
+                              <select *ngSwitchCase="'VALUELIST'" class="form-select" formControlName="value">
+                                <option [ngValue]="null" disabled>Выберите значение</option>
+                                <option *ngFor="let item of getValueListItems(definition)" [ngValue]="item.id">
+                                  {{ item.value }}
+                                </option>
+                              </select>
+
+                              <!-- 🔹 Multi Value List -->
+                              <select *ngSwitchCase="'MULTI_VALUELIST'" class="form-select" multiple formControlName="value">
+                                <option *ngFor="let item of getValueListItems(definition)" [ngValue]="item.id">
+                                  {{ item.value }}
+                                </option>
+                              </select>
+
                               <input *ngSwitchDefault type="text" class="form-control" formControlName="value"/>
                             </ng-container>
                           </ng-container>
@@ -258,7 +271,15 @@
                   </div>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-3">
-                  <button type="button" class="btn btn-outline-primary" (click)="addProperty()">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    (click)="addProperty()"
+                    [disabled]="
+    propertiesControls.length > 0 &&
+    propertiesControls[propertiesControls.length - 1].get('propertyDefId')?.value === null
+  "
+                  >
                     <i class="fa-solid fa-plus me-1"></i>
                     Добавить свойство
                   </button>
