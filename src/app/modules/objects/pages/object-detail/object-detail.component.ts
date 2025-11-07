@@ -1,4 +1,4 @@
-import { AsyncPipe, DatePipe, DecimalPipe, NgClass, NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from '@angular/common';
+import { AsyncPipe, DatePipe, NgClass, NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -17,9 +17,21 @@ import {
   Validators
 } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import {BehaviorSubject, Observable, Subject, combineLatest, of, filter, pairwise, from, mergeMap} from 'rxjs';
 import {
-  catchError,
+  BehaviorSubject,
+  Observable,
+  Subject,
+  combineLatest,
+  of,
+  filter,
+  pairwise,
+  from,
+  mergeMap,
+  merge,
+  auditTime
+} from 'rxjs';
+import {
+  catchError, debounceTime, distinctUntilChanged,
   map,
   shareReplay,
   startWith,
@@ -106,8 +118,20 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly cdRef = inject(ChangeDetectorRef);
 
   private readonly destroy$ = new Subject<void>();
+
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private readonly propertiesReload$ = new BehaviorSubject<void>(undefined);
+
+  private readonly safeReload$ = this.reload$.pipe(
+    auditTime(100),      // ⚡ заменяет distinctUntilChanged — пропускает редкие триггеры
+    shareReplay(1)
+  );
+
+  private readonly safePropertiesReload$ = this.propertiesReload$.pipe(
+    auditTime(100),
+    shareReplay(1)
+  );
+
   private readonly linksReload$ = new BehaviorSubject<void>(undefined);
   private readonly auditReload$ = new BehaviorSubject<void>(undefined);
   private readonly selectedVersionSubject = new BehaviorSubject<number | null>(null);
@@ -115,6 +139,29 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   expandedVersionId: number | null = null;
   highlightedVersionId: number | null = null;
   selectedVersionModel: number | null = null;
+
+
+
+
+  private readonly unifiedReload$ = merge(
+    this.reload$.pipe(map(() => 'reload')),
+    this.linksReload$.pipe(map(() => 'links'))
+  ).pipe(
+    debounceTime(100),
+    tap(type => console.log('🔁 unifiedReload triggered by:', type)),
+    shareReplay(1)
+  );
+
+
+  private readonly auditTrigger$ = merge(
+    this.reload$,
+    this.auditReload$
+  ).pipe(
+    debounceTime(100),
+    shareReplay(1)
+  );
+
+
 
 
   private propertyDefinitions: PropertyDefinition[] = [];
@@ -125,6 +172,16 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private typesCache: ObjectType[] = [];
 
   readonly message$ = this.uiMessages.message$;
+
+  readonly linkDirections = Object.values(LinkDirection);
+
+  activeTab: 'properties' | 'versions' | 'files' | 'links' = 'properties';
+  isSavingObject = false;
+  isSavingProperties = false;
+  isLinkActionInProgress = false;
+
+  hasChanges = false;
+  private originalObjectData: any;
 
   protected objectForm = this.fb.group({
     name: this.fb.nonNullable.control('', { validators: [Validators.required, Validators.maxLength(255)] }),
@@ -154,7 +211,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     shareReplay(1)
   );
 
-  readonly object$ = combineLatest([this.objectId$, this.reload$]).pipe(
+
+  readonly object$ = combineLatest([this.objectId$, this.unifiedReload$]).pipe(
     switchMap(([objectId]) =>
       Number.isNaN(objectId)
         ? of<RepositoryObject | null>(null)
@@ -165,14 +223,35 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
           })
         )
     ),
-    tap(object => {
-      if (object) {
-        this.initObjectForm(object);
-      }
-    }),
-
+    tap(object => object && this.initObjectForm(object)),
     shareReplay(1)
   );
+
+  readonly versions$ = combineLatest([this.objectId$, this.safeReload$]).pipe(
+    switchMap(([objectId]) =>
+      Number.isNaN(objectId)
+        ? of<ObjectVersion[]>([])
+        : this.objectVersionApi.listByObject(objectId).pipe(
+          map(versions => versions.sort((a, b) => b.versionNum - a.versionNum)),
+          catchError(() => {
+            this.showMessage('error', 'Не удалось загрузить версии объекта.');
+            return of<ObjectVersion[]>([]);
+          })
+        )
+    ),
+    tap(versions => {
+      const current = this.selectedVersionSubject.value;
+      if (!current || !versions.some(v => v.id === current)) {
+        this.selectVersion(versions[0]?.id ?? null, false);
+      }
+    }),
+    shareReplay(1)
+  );
+
+
+
+
+
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     tap(types => {
@@ -204,31 +283,13 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     map(([classes, typeId]) => (typeId ? classes.filter(cls => cls.objectTypeId === typeId) : classes))
   );
 
-  readonly versions$ = combineLatest([this.objectId$, this.reload$]).pipe(
-    switchMap(([objectId]) =>
-      Number.isNaN(objectId)
-        ? of<ObjectVersion[]>([])
-        : this.objectVersionApi.listByObject(objectId).pipe(
-          map(versions => versions.slice().sort((a, b) => b.versionNum - a.versionNum)),
-          catchError(() => {
-            this.showMessage('error', 'Не удалось загрузить версии объекта.');
-            return of<ObjectVersion[]>([]);
-          })
-        )
-    ),
-    tap(versions => {
-      const current = this.selectedVersionSubject.value;
-      if (!current || !versions.some(version => version.id === current)) {
-        this.selectVersion(versions[0]?.id ?? null, false);
-      }
-    }),
-    shareReplay(1)
-  );
+
+
 
   readonly selectedVersionId$ = this.selectedVersionSubject.asObservable();
 
-  readonly selectedVersionDetail$ = combineLatest([this.selectedVersionId$, this.reload$]).pipe(
-    switchMap(([versionId]) => {
+  readonly selectedVersionDetail$ = this.selectedVersionId$.pipe(
+    switchMap(versionId => {
       if (!versionId) {
         return of<ObjectVersionDetail | null>(null);
       }
@@ -242,9 +303,11 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     shareReplay(1)
   );
 
+
+
   readonly selectedVersionWithAudit$: Observable<VersionWithAudit> = combineLatest([
     this.selectedVersionDetail$,
-    this.auditReload$
+    this.auditTrigger$
   ]).pipe(
     switchMap(([version]) => {
       if (!version) {
@@ -260,6 +323,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     }),
     shareReplay(1)
   );
+
+
 
   readonly isLatestVersionSelected$ = combineLatest([this.versions$, this.selectedVersionId$]).pipe(
     map(([versions, selectedId]) => {
@@ -320,11 +385,12 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   );
 
 
-  readonly properties$ = combineLatest([this.selectedVersionId$, this.propertiesReload$]).pipe(
+  readonly properties$ = combineLatest([
+    this.selectedVersionId$.pipe(distinctUntilChanged()), // ✅ фильтруем повторные ID
+    this.safePropertiesReload$
+  ]).pipe(
     switchMap(([versionId]) => {
-      if (!versionId) {
-        return of<PropertyValue[]>([]);
-      }
+      if (!versionId) return of<PropertyValue[]>([]);
       return this.propertyValueApi.get(versionId).pipe(
         catchError(() => {
           this.showMessage('error', 'Не удалось загрузить значения свойств.');
@@ -335,6 +401,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     tap(values => this.rebuildPropertiesForm(values)),
     shareReplay(1)
   );
+
+
 
   readonly links$ = combineLatest([this.objectId$, this.linksReload$]).pipe(
     switchMap(([objectId]) =>
@@ -358,15 +426,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     shareReplay(1)
   );
 
-  readonly linkDirections = Object.values(LinkDirection);
 
-  activeTab: 'properties' | 'versions' | 'files' | 'links' = 'properties';
-  isSavingObject = false;
-  isSavingProperties = false;
-  isLinkActionInProgress = false;
-
-  hasChanges = false;
-  private originalObjectData: any;
 
   ngOnInit(): void {
     this.propertyDefinitions$
@@ -491,11 +551,9 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   }
 
   refreshAll(): void {
-    this.reload$.next();
-    this.propertiesReload$.next();
-    this.linksReload$.next();
-    this.auditReload$.next();
+    [this.reload$, this.propertiesReload$, this.linksReload$, this.auditReload$].forEach(s => s.next());
   }
+
 
   refreshAudit(): void {
     this.auditReload$.next();
@@ -595,7 +653,10 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     const values = this.propertiesForm.controls
       .map(ctrl => ({
         propertyDefId: ctrl.get('propertyDefId')!.value!,
-        value: this.parsePropertyValue(ctrl.get('propertyDefId')!.value!, ctrl.get('value')!.value ?? '')
+        value: this.parsePropertyValue(
+          ctrl.get('propertyDefId')!.value!,
+          ctrl.get('value')!.value ?? ''
+        )
       }))
       .filter(v => v.propertyDefId !== null) as PropertyValue[];
 
@@ -608,9 +669,10 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
           this.showMessage('success', 'Свойства успешно сохранены.');
           this.isSavingProperties = false;
 
-          // Просто триггерим обновление данных
-          this.propertiesReload$.next();
-          this.auditReload$.next();
+          // ❗️Только перезагружаем версии/объект.
+          // Если бэкенд создал новую версию — выберется latest и свойства подтянутся сами.
+          // Если новая версия НЕ создаётся в этом кейсе — можно вернуть propertiesReload$.next()
+          // (но обычно для свойств логично версионировать).
           this.reload$.next();
         },
         error: () => {
@@ -619,6 +681,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         }
       });
   }
+
 
 
 
