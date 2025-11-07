@@ -34,29 +34,35 @@
           <div class="table-responsive">
             <table class="table table-hover mb-0">
               <thead class="table-light">
-                <tr>
-                  <th scope="col" class="text-uppercase small text-muted">Название</th>
-                  <th scope="col" class="text-uppercase small text-muted">Тип</th>
-                  <th scope="col" class="text-uppercase small text-muted">Класс</th>
-                  <th scope="col" class="text-uppercase small text-muted">Создан</th>
-                </tr>
+              <tr>
+                <th scope="col" class="text-uppercase small text-muted">Название</th>
+                <th scope="col" class="text-uppercase small text-muted">Тип</th>
+                <th scope="col" class="text-uppercase small text-muted">Класс</th>
+                <th scope="col" class="text-uppercase small text-muted">Создан</th>
+              </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let obj of (recentObjects$ | async)?.content">
-                  <td class="fw-semibold">{{ obj.name }}</td>
-                  <td>#{{ obj.typeId }}</td>
-                  <td>
-                    <span class="badge bg-light text-dark" *ngIf="obj.classId; else noClass">Класс {{ obj.classId }}</span>
-                    <ng-template #noClass><span class="text-muted">—</span></ng-template>
-                  </td>
-                  <td>
-                    <span *ngIf="obj.createdAt; else unknown">{{ obj.createdAt | date: 'dd.MM.yyyy HH:mm' }}</span>
-                    <ng-template #unknown><span class="text-muted">нет данных</span></ng-template>
-                  </td>
-                </tr>
-                <tr *ngIf="((recentObjects$ | async)?.content?.length ?? 0) === 0">
-                  <td colspan="4" class="text-center text-muted py-4">Нет объектов для отображения</td>
-                </tr>
+              <tr *ngFor="let obj of (recentObjects$ | async)?.content">
+                <td class="fw-semibold">{{ obj.name }}</td>
+                <td>
+                  <span class="text-muted" *ngIf="!obj.typeName">—</span>
+                  <span *ngIf="obj.typeName">{{ obj.typeName }}</span>
+                </td>
+                <td>
+                    <span class="badge bg-light text-dark" *ngIf="obj.className; else noClass">
+                      {{ obj.className }}
+                    </span>
+                  <ng-template #noClass><span class="text-muted">—</span></ng-template>
+                </td>
+
+                <td>
+                  <span *ngIf="obj.createdAt; else unknown">{{ obj.createdAt | date: 'dd.MM.yyyy HH:mm' }}</span>
+                  <ng-template #unknown><span class="text-muted">нет данных</span></ng-template>
+                </td>
+              </tr>
+              <tr *ngIf="((recentObjects$ | async)?.content?.length ?? 0) === 0">
+                <td colspan="4" class="text-center text-muted py-4">Нет объектов для отображения</td>
+              </tr>
               </tbody>
             </table>
           </div>
@@ -141,7 +147,8 @@
         <div class="card-body">
           <form [formGroup]="searchForm" class="d-flex flex-column gap-3">
             <div class="input-group">
-              <span class="input-group-text bg-transparent border-end-0"><i class="fa-solid fa-magnifying-glass"></i></span>
+              <span class="input-group-text bg-transparent border-end-0"><i
+                class="fa-solid fa-magnifying-glass"></i></span>
               <input
                 type="search"
                 class="form-control border-start-0"

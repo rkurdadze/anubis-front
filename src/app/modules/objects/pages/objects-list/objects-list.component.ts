@@ -58,6 +58,8 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     }),
     shareReplay(1)
   );
+
+
   readonly classes$ = this.classApi.list(0, 500).pipe(
     map(response => response.content ?? []),
     catchError(() => {
@@ -93,6 +95,26 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     tap(response => {
       this.totalPages = response.page?.totalPages ?? 1;
       this.isPerformingAction = false;
+    }),
+    shareReplay(1)
+  );
+
+  readonly objectsPageWithNames$: Observable<Page<ObjectsListItem>> = combineLatest([
+    this.objectsPage$,
+    this.objectTypes$,
+    this.classes$
+  ]).pipe(
+    map(([page, types, classes]) => {
+      const content = page.content.map(obj => {
+        const type = types.find(t => t.id === obj.typeId);
+        const cls = classes.find(c => c.id === obj.classId);
+        return {
+          ...obj,
+          typeName: type?.name ?? `Тип #${obj.typeId ?? '—'}`,
+          className: cls?.name ?? `Класс #${obj.classId ?? '—'}`
+        };
+      });
+      return { ...page, content };
     }),
     shareReplay(1)
   );

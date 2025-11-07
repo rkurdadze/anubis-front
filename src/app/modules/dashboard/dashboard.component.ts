@@ -1,19 +1,22 @@
-import {AsyncPipe, DatePipe, DecimalPipe, NgClass, NgFor, NgIf} from '@angular/common';
-import {ChangeDetectionStrategy, Component, OnInit} from '@angular/core';
-import {FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
-import {RouterLink} from '@angular/router';
-import {combineLatest, forkJoin, Observable, of} from 'rxjs';
-import {catchError, map, shareReplay, startWith, switchMap} from 'rxjs/operators';
+import { AsyncPipe, DatePipe, DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { combineLatest, forkJoin, Observable, of } from 'rxjs';
+import { catchError, map, shareReplay, startWith, switchMap } from 'rxjs/operators';
 
-import {VaultApi} from '../../core/api/vault.api';
-import {ObjectTypeApi} from '../../core/api/object-type.api';
-import {ObjectApi} from '../../core/api/object.api';
-import {ValueListApi} from '../../core/api/value-list.api';
-import {SearchApi} from '../../core/api/search.api';
-import {RepositoryObject} from '../../core/models/object.model';
-import {Vault} from '../../core/models/vault.model';
-import {ObjectType} from '../../core/models/object-type.model';
-import {Page} from '../../core/models/page.model';
+import { VaultApi } from '../../core/api/vault.api';
+import { ObjectTypeApi } from '../../core/api/object-type.api';
+import { ObjectApi } from '../../core/api/object.api';
+import { ValueListApi } from '../../core/api/value-list.api';
+import { SearchApi } from '../../core/api/search.api';
+import { ClassApi } from '../../core/api/class.api';
+
+import { RepositoryObject } from '../../core/models/object.model';
+import { Vault } from '../../core/models/vault.model';
+import { ObjectType } from '../../core/models/object-type.model';
+import { ObjectClass } from '../../core/models/class.model';
+import { Page } from '../../core/models/page.model';
 
 interface DashboardMetrics {
   vaults: number;
@@ -38,15 +41,25 @@ interface ActivityStatistic {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [NgIf, NgFor, AsyncPipe, DecimalPipe, DatePipe, ReactiveFormsModule, RouterLink, NgClass],
+  imports: [
+    NgIf,
+    NgFor,
+    AsyncPipe,
+    DecimalPipe,
+    DatePipe,
+    ReactiveFormsModule,
+    RouterLink,
+    NgClass
+  ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DashboardComponent implements OnInit {
   searchForm!: FormGroup;
+
   metrics$!: Observable<DashboardMetrics>;
-  recentObjects$!: Observable<Page<RepositoryObject>>;
+  recentObjects$!: Observable<Page<RepositoryObject & { className?: string }>>;
   searchResults$!: Observable<number[]>;
   objectDistribution$!: Observable<ObjectDistributionItem[]>;
   activeVaults$!: Observable<Vault[]>;
@@ -58,165 +71,185 @@ export class DashboardComponent implements OnInit {
     private readonly objectTypeApi: ObjectTypeApi,
     private readonly objectApi: ObjectApi,
     private readonly valueListApi: ValueListApi,
+    private readonly classApi: ClassApi,
     private readonly searchApi: SearchApi
-  ) {
-  }
+  ) {}
 
   ngOnInit(): void {
-    // === Инициализация формы ===
-    this.searchForm = this.fb.group({query: ['']});
+    this.searchForm = this.fb.group({ query: [''] });
+    this.initDashboardData();
+  }
 
-    const vaults$ = this.vaultApi
+  /** Инициализация всех потоков данных дашборда */
+  private initDashboardData(): void {
+    const vaults$ = this.loadVaults();
+    const objectTypes$ = this.loadObjectTypes();
+    const objectsPage$ = this.loadObjectsPage();
+    const classes$ = this.loadClasses();
+
+    this.activeVaults$ = vaults$.pipe(map(v => v.filter(x => x.isActive)));
+
+    this.metrics$ = this.buildMetrics$(vaults$, objectTypes$, objectsPage$);
+    this.recentObjects$ = this.buildRecentObjects$(objectsPage$, classes$, objectTypes$);
+    this.objectDistribution$ = this.buildDistribution$(objectsPage$, objectTypes$);
+    this.activityStats$ = this.buildActivityStats$(objectsPage$);
+    this.searchResults$ = this.buildSearchResults$();
+  }
+
+  // === ЗАГРУЗКА ДАННЫХ ===
+
+  private loadVaults(): Observable<Vault[]> {
+    return this.vaultApi
       .list()
-      .pipe(catchError(() => of<Vault[]>([])), shareReplay({bufferSize: 1, refCount: true}));
+      .pipe(catchError(() => of([])), shareReplay({ bufferSize: 1, refCount: true }));
+  }
 
-    const activeVaults$ = vaults$.pipe(map(items => items.filter(vault => vault.isActive)));
-
-    const objectTypes$ = this.objectTypeApi
+  private loadObjectTypes(): Observable<ObjectType[]> {
+    return this.objectTypeApi
       .list()
-      .pipe(catchError(() => of<ObjectType[]>([])), shareReplay({bufferSize: 1, refCount: true}));
+      .pipe(catchError(() => of([])), shareReplay({ bufferSize: 1, refCount: true }));
+  }
 
-    // Загружаем первую страницу один раз
-    const objectsPage$ = this.objectApi.list(0, 100).pipe(
-      catchError(() =>
-        of<Page<RepositoryObject>>({
-          content: [],
-          page: {
-            totalElements: 0,
-            totalPages: 0,
-            number: 0,
-            size: 0
-          }
-        })
-      ),
-      shareReplay({ bufferSize: 1, refCount: true })
-    );
+  private loadClasses(): Observable<ObjectClass[]> {
+    return this.classApi
+      .list(0, 1000) // или без параметров, если API поддерживает получение всех
+      .pipe(
+        map(page => page.content ?? []),
+        catchError(() => of([])),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+  }
 
-    // Метрика — считает totalElements
+
+  private loadObjectsPage(): Observable<Page<RepositoryObject>> {
+    return this.objectApi
+      .list(0, 10)
+      .pipe(
+        catchError(() =>
+          of<Page<RepositoryObject>>({
+            content: [],
+            page: { totalElements: 0, totalPages: 0, number: 0, size: 0 }
+          })
+        ),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+  }
+
+  // === ПОСТРОЕНИЕ ПОТОКОВ ===
+
+  private buildMetrics$(
+    vaults$: Observable<Vault[]>,
+    objectTypes$: Observable<ObjectType[]>,
+    objectsPage$: Observable<Page<RepositoryObject>>
+  ): Observable<DashboardMetrics> {
+    const activeVaultsCount$ = vaults$.pipe(map(v => v.filter(x => x.isActive).length));
+    const objectTypesCount$ = objectTypes$.pipe(map(v => v.length));
     const objectsCount$ = objectsPage$.pipe(
-      map(page => page.page?.totalElements ?? page.content?.length ?? 0),
-      catchError(() => of(0))
+      map(page => page.page?.totalElements ?? page.content.length ?? 0)
     );
-
-    // Для отображения таблицы
-    const objectsPageForView$ = objectsPage$;
-
     const valueListsCount$ = this.valueListApi
       .list(0, 1)
       .pipe(
-        map(page => {
-          const total = page.page?.totalElements ?? 0;
-          return total > 0 ? total : page.content?.length ?? 0;
-        }),
-        catchError(() => of(0)),
-        shareReplay({ bufferSize: 1, refCount: true })
+        map(p => p.page?.totalElements ?? p.content.length ?? 0),
+        catchError(() => of(0))
       );
 
-    // === Метрики ===
-    this.metrics$ = forkJoin({
-      vaults: activeVaults$.pipe(map(items => items.length)),
-      objectTypes: objectTypes$.pipe(map(items => items.length)),
+    return forkJoin({
+      vaults: activeVaultsCount$,
+      objectTypes: objectTypesCount$,
       objects: objectsCount$,
       valueLists: valueListsCount$
     });
+  }
 
-    this.activeVaults$ = activeVaults$;
-
-    // === Последние объекты ===
-    this.recentObjects$ = objectsPageForView$.pipe(
-      map(page => ({
-        content: page.content.slice(0, 6),
-        page: {
-          totalElements: page.page?.totalElements ?? 0,
-          totalPages: page.page?.totalPages ?? 0,
-          number: page.page?.number ?? 0,
-          size: page.page?.size ?? 0
-        }
-      } as Page<RepositoryObject>))
+  private buildRecentObjects$(
+    objectsPage$: Observable<Page<RepositoryObject>>,
+    classes$: Observable<ObjectClass[]>,
+    objectTypes$: Observable<ObjectType[]>
+  ): Observable<Page<RepositoryObject & { className?: string; typeName?: string }>> {
+    return combineLatest([objectsPage$, classes$, objectTypes$]).pipe(
+      map(([page, classes, types]) => {
+        const content = page.content.slice(0, 6).map(obj => {
+          const cls = classes.find(c => c.id === obj.classId);
+          const type = types.find(t => t.id === obj.typeId);
+          return {
+            ...obj,
+            className: cls?.name ?? `Класс #${obj.classId ?? '—'}`,
+            typeName: type?.name ?? `Тип #${obj.typeId ?? '—'}`
+          };
+        });
+        return { ...page, content };
+      })
     );
+  }
 
-    // === Распределение объектов ===
-    this.objectDistribution$ = combineLatest([objectsPageForView$, objectTypes$]).pipe(
-      map(([page, objectTypes]) => {
+
+  private buildDistribution$(
+    objectsPage$: Observable<Page<RepositoryObject>>,
+    objectTypes$: Observable<ObjectType[]>
+  ): Observable<ObjectDistributionItem[]> {
+    return combineLatest([objectsPage$, objectTypes$]).pipe(
+      map(([page, types]) => {
         const list = page.content;
-        if (!list.length) {
-          return [];
-        }
-        const totalObjects = list.length;
-        const counts = list.reduce((acc, current) => {
-          const currentCount = acc.get(current.typeId) ?? 0;
-          acc.set(current.typeId, currentCount + 1);
+        if (!list.length) return [];
+        const total = list.length;
+        const counts = list.reduce((acc, cur) => {
+          acc.set(cur.typeId, (acc.get(cur.typeId) ?? 0) + 1);
           return acc;
         }, new Map<number, number>());
 
         return Array.from(counts.entries())
-          .sort(([aKey, aVal], [bKey, bVal]) => bVal - aVal)
+          .sort((a, b) => b[1] - a[1])
           .slice(0, 5)
-          .map(([typeId, count]: [number, number]) => {
-            const type = objectTypes.find(item => item.id === typeId);
-            return {
-              typeId,
-              typeName: type?.name ?? `Тип #${typeId}`,
-              count,
-              percentage: totalObjects ? (count / totalObjects) * 100 : 0
-            };
-          });
+          .map(([typeId, count]) => ({
+            typeId,
+            typeName: types.find(t => t.id === typeId)?.name ?? `Тип #${typeId}`,
+            count,
+            percentage: total ? (count / total) * 100 : 0
+          }));
       })
     );
+  }
 
-    // === Активность по созданию ===
-    this.activityStats$ = objectsPageForView$.pipe(
+  private buildActivityStats$(
+    objectsPage$: Observable<Page<RepositoryObject>>
+  ): Observable<ActivityStatistic> {
+    return objectsPage$.pipe(
       map(page => {
         const list = page.content;
-        if (!list.length) {
-          return {days: [], total: 0, max: 0};
-        }
+        if (!list.length) return { days: [], total: 0, max: 0 };
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const formatter = new Intl.DateTimeFormat('ru-RU', {day: '2-digit', month: 'short'});
+        const fmt = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' });
 
-        const days = Array.from({length: 7}).map((_, index) => {
+        const days = Array.from({ length: 7 }).map((_, i) => {
           const day = new Date(today);
-          day.setDate(today.getDate() - (6 - index));
-          const startOfDay = new Date(day);
-          const endOfDay = new Date(day);
-          endOfDay.setHours(23, 59, 59, 999);
-
-          const count = list.filter(item => {
-            if (!item.createdAt) {
-              return false;
-            }
-
-            const createdAt = new Date(item.createdAt);
-            return createdAt >= startOfDay && createdAt <= endOfDay;
-          }).length;
-
-          return {
-            label: formatter.format(day),
-            count
-          };
+          day.setDate(today.getDate() - (6 - i));
+          const start = new Date(day);
+          const end = new Date(day);
+          end.setHours(23, 59, 59, 999);
+          const count = list.filter(
+            x => x.createdAt && new Date(x.createdAt) >= start && new Date(x.createdAt) <= end
+          ).length;
+          return { label: fmt.format(day), count };
         });
-
-        const max = days.reduce((acc, item) => Math.max(acc, item.count), 0);
-        const total = days.reduce((acc, item) => acc + item.count, 0);
 
         return {
           days,
-          total,
-          max
+          total: days.reduce((a, d) => a + d.count, 0),
+          max: Math.max(...days.map(d => d.count))
         };
       })
     );
+  }
 
-    // === Результаты поиска ===
-    this.searchResults$ = this.searchForm.valueChanges.pipe(
+  private buildSearchResults$(): Observable<number[]> {
+    return this.searchForm.valueChanges.pipe(
       startWith(this.searchForm.value),
-      map(value => value?.query?.trim() ?? ''),
-      switchMap(query =>
-        !query
-          ? of<number[]>([])
-          : this.searchApi.search(query).pipe(catchError(() => of<number[]>([])))
+      map(v => v?.query?.trim() ?? ''),
+      switchMap(q =>
+        !q ? of([]) : this.searchApi.search(q).pipe(catchError(() => of<number[]>([])))
       )
     );
   }
