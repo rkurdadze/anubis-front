@@ -387,6 +387,7 @@
             [object]="object"
             [canUpload]="canUploadFiles()"
             (message)="handleFilesMessage($event)"
+            (fileChange)="onFileChange()"
           ></app-object-files-tab>
         </section>
 

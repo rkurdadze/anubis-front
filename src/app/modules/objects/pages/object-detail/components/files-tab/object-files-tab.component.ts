@@ -59,6 +59,8 @@ export class ObjectFilesTabComponent implements OnDestroy {
   @Input() canUpload = false;
 
   @Output() readonly message = new EventEmitter<UiMessage>();
+  @Output() readonly fileChange = new EventEmitter<void>();
+
 
   readonly files$: Observable<ObjectFile[]> = combineLatest([this.object$, this.reload$]).pipe(
     switchMap(([object]) => {
@@ -121,12 +123,14 @@ export class ObjectFilesTabComponent implements OnDestroy {
         next: updated => {
           this.emitMessage('success', 'Файл обновлён.');
           this.reload$.next();
+          this.fileChange.emit(); // 🔹 <— добавь вот это
           if (this.previewFile?.id === targetFile.id) {
             this.selectFile({ ...targetFile, filename: updated.filename, size: updated.size }, true);
           }
         },
         error: () => this.emitMessage('error', 'Не удалось заменить файл.')
       });
+
   }
 
   deleteFile(file: ObjectFile): void {
@@ -143,6 +147,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
             this.clearPreview();
           }
           this.reload$.next();
+          this.fileChange.emit();
         },
         error: () => this.emitMessage('error', 'Не удалось удалить файл.')
       });
@@ -222,6 +227,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
           this.emitMessage('success', 'Изменения сохранены.');
           this.previewFile = { ...this.previewFile!, filename: updated.filename, size: updated.size };
           this.reload$.next();
+          this.fileChange.emit();
           this.selectFile(this.previewFile, true);
         },
         error: () => this.emitMessage('error', 'Не удалось сохранить файл.')
@@ -334,6 +340,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
         next: result => {
           if (result) {
             this.reload$.next();
+            this.fileChange.emit();
           }
         },
         error: () => this.emitMessage('error', 'Во время загрузки произошла ошибка.')

@@ -28,14 +28,14 @@ import {
   from,
   mergeMap,
   merge,
-  auditTime
+  auditTime, throttleTime, exhaustMap
 } from 'rxjs';
 import {
   catchError, debounceTime, distinctUntilChanged,
   map,
   shareReplay,
   startWith,
-  switchMap,
+  switchMap, take,
   takeUntil,
   tap
 } from 'rxjs/operators';
@@ -141,6 +141,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   selectedVersionModel: number | null = null;
 
 
+  private readonly versionsReload$ = new BehaviorSubject<void>(undefined);
+
 
 
   private readonly unifiedReload$ = merge(
@@ -153,13 +155,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   );
 
 
-  private readonly auditTrigger$ = merge(
-    this.reload$,
-    this.auditReload$
-  ).pipe(
-    debounceTime(100),
-    shareReplay(1)
-  );
+
 
 
 
@@ -227,7 +223,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     shareReplay(1)
   );
 
-  readonly versions$ = combineLatest([this.objectId$, this.safeReload$]).pipe(
+  readonly versions$ = combineLatest([this.objectId$, this.versionsReload$]).pipe(
     switchMap(([objectId]) =>
       Number.isNaN(objectId)
         ? of<ObjectVersion[]>([])
@@ -247,6 +243,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     }),
     shareReplay(1)
   );
+
 
 
 
@@ -304,25 +301,27 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   );
 
 
+  readonly selectedVersionWithAudit$: Observable<VersionWithAudit> =
+    this.selectedVersionDetail$.pipe(
+      switchMap(versionDetail => {
+        if (!versionDetail) return of<VersionWithAudit>({ version: null, audit: [] });
 
-  readonly selectedVersionWithAudit$: Observable<VersionWithAudit> = combineLatest([
-    this.selectedVersionDetail$,
-    this.auditTrigger$
-  ]).pipe(
-    switchMap(([version]) => {
-      if (!version) {
-        return of<VersionWithAudit>({ version: null, audit: [] });
-      }
-      return this.objectVersionApi.getAudit(version.id).pipe(
-        map(audit => ({ version, audit })),
-        catchError(() => {
-          this.showMessage('error', 'Не удалось загрузить журнал аудита версии.');
-          return of<VersionWithAudit>({ version, audit: [] });
-        })
-      );
-    }),
-    shareReplay(1)
-  );
+        // 🔹 слушаем только ручные обновления аудита
+        return this.auditReload$.pipe(
+          startWith(void 0),
+          exhaustMap(() =>
+            this.objectVersionApi.getAudit(versionDetail.id).pipe(
+              map(audit => ({ version: versionDetail, audit })),
+              catchError(() => {
+                this.showMessage('error', 'Не удалось загрузить журнал аудита версии.');
+                return of<VersionWithAudit>({ version: versionDetail, audit: [] });
+              })
+            )
+          )
+        );
+      }),
+      shareReplay(1)
+    );
 
 
 
@@ -456,17 +455,13 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .subscribe(([_, curr]) => {
         const latest = curr[0];
         if (latest) {
-          // Выбираем и раскрываем последнюю версию
-          this.selectVersion(latest.id);
+          this.selectVersion(latest.id, /* triggerReload */ false); // ← было true
           this.expandedVersionId = latest.id;
 
-          // Подсветка новой версии для визуального фидбека
           this.highlightedVersionId = latest.id;
-          setTimeout(() => (this.highlightedVersionId = null), 10000);
+          setTimeout(() => (this.highlightedVersionId = null), 10_000);
 
-          // Обновляем журнал аудита
-          this.auditReload$.next();
-
+          // УБРАНО: this.auditReload$.next();
           // Уведомление пользователю
           this.showMessage('info', `Автоматически выбрана новая версия v${latest.versionNum}.`);
         }
@@ -485,6 +480,17 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
     this.uiMessages.destroy();
   }
+
+
+
+  onFileChange(): void {
+    console.log('📂 [onFileChange] refreshing versions only');
+    this.versionsReload$.next();
+  }
+
+
+
+
 
 
   /**
