@@ -17,14 +17,6 @@
     </div>
   </header>
 
-  <div *ngIf="message$ | async as message" class="alert"
-       [ngClass]="{'alert-success': message.type === 'success', 'alert-danger': message.type === 'error'}">
-    <div class="d-flex justify-content-between align-items-start">
-      <span>{{ message.text }}</span>
-      <button type="button" class="btn-close" aria-label="Закрыть" (click)="dismissMessage()"></button>
-    </div>
-  </div>
-
   <div class="card border-0 anubis-shadow mb-4">
     <div class="card-body">
       <form class="row gy-3 gx-3 align-items-end" [formGroup]="filterForm">

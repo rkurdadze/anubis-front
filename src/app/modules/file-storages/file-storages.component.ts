@@ -8,7 +8,7 @@ import { catchError, finalize, map, startWith } from 'rxjs/operators';
 import { FileStorageApi } from '../../core/api/file-storage.api';
 import { FileStorage, SaveFileStoragePayload } from '../../core/models/file-storage.model';
 import { StorageKind } from '../../core/models/storage-kind.enum';
-import { UiMessage, UiMessageService } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 
 interface StorageMetrics {
   total: number;
@@ -47,7 +47,7 @@ interface StorageFormValue {
 export class FileStoragesComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly fileStorageApi = inject(FileStorageApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
 
   private readonly storagesSubject = new BehaviorSubject<FileStorage[]>([]);
   private readonly selectedStorageIdSubject = new BehaviorSubject<number | null>(null);
@@ -70,8 +70,6 @@ export class FileStoragesComponent implements OnDestroy {
     isDefault: this.fb.nonNullable.control(false),
     isActive: this.fb.nonNullable.control(true)
   });
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly storages$ = this.storagesSubject.asObservable();
   readonly selectedStorage$ = combineLatest([this.storages$, this.selectedStorageIdSubject.asObservable()]).pipe(
@@ -166,7 +164,8 @@ export class FileStoragesComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.uiMessages.destroy();
+    this.storagesSubject.complete();
+    this.selectedStorageIdSubject.complete();
   }
 
   trackByStorageId(_: number, storage: FileStorage): number {
@@ -551,7 +550,7 @@ export class FileStoragesComponent implements OnDestroy {
     secretKeyControl?.updateValueAndValidity({ emitEvent: false });
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 }

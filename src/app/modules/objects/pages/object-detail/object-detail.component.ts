@@ -59,7 +59,7 @@ import { LinkRole } from '../../../../core/models/link-role.model';
 import { LinkDirection } from '../../../../core/models/object-link-direction.enum';
 import { ObjectVersionAudit } from '../../../../core/models/object-version-audit.model';
 import { PropertyDataType } from '../../../../core/models/property-data-type.enum';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../../../shared/services/toast.service';
 import { ObjectFilesTabComponent } from './components/files-tab/object-files-tab.component';
 import {ValueListApi} from '../../../../core/api/value-list.api';
 import {ValueListItem} from '../../../../core/models/value-list.model';
@@ -113,7 +113,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly objectLinkApi = inject(ObjectLinkApi);
   private readonly linkRoleApi = inject(LinkRoleApi);
   private readonly valueListApi = inject(ValueListApi);
-  private readonly uiMessages = inject(UiMessageService).create();
+  private readonly toast = inject(ToastService);
 
   private readonly cdRef = inject(ChangeDetectorRef);
 
@@ -166,8 +166,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private propertyDefinitionMap = new Map<number, PropertyDefinition>();
   private classesCache: ObjectClass[] = [];
   private typesCache: ObjectType[] = [];
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly linkDirections = Object.values(LinkDirection);
 
@@ -478,7 +476,6 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 
 
@@ -887,16 +884,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  dismissMessage(): void {
-    this.uiMessages.dismiss();
-  }
-
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
-  }
-
-  handleFilesMessage(message: UiMessage): void {
-    this.showMessage(message.type, message.text);
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 
   onVersionDropdownChange(versionId: number | null): void {

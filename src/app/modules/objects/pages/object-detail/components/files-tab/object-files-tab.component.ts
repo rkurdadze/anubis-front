@@ -5,6 +5,7 @@ import {
   NgFor,
   NgIf
 } from '@angular/common';
+import { HttpEventType } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -18,15 +19,23 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BehaviorSubject, Observable, Subject, combineLatest, from, of } from 'rxjs';
-import { catchError, concatMap, finalize, switchMap, take, takeUntil, tap } from 'rxjs/operators';
+import { catchError, concatMap, finalize, last, map, switchMap, take, takeUntil, tap } from 'rxjs/operators';
 
 import { FileApi } from '../../../../../../core/api/file.api';
 import { ObjectFile, RepositoryObject } from '../../../../../../core/models/object.model';
-import { UiMessage } from '../../../../../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../../../../../shared/services/toast.service';
 import {
   FilePreviewComponent
 } from './components/file-preview/file-preview.component';
-import { determinePreviewKind, getFileIconClass, formatFileSize } from './components/file-preview/file-preview.helpers';
+import { determinePreviewKind, getFileIconClass, formatFileSize, ZipBuilder } from './components/file-preview/file-preview.helpers';
+
+interface UploadProgressState {
+  totalFiles: number;
+  completedFiles: number;
+  currentFileName: string;
+  currentFilePercent: number;
+  overallPercent: number;
+}
 
 @Component({
   selector: 'app-object-files-tab',
@@ -38,13 +47,6 @@ import { determinePreviewKind, getFileIconClass, formatFileSize } from './compon
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ObjectFilesTabComponent implements OnDestroy {
-  private readonly fileApi: FileApi;
-  private readonly cdr: ChangeDetectorRef;
-
-  constructor(fileApi: FileApi, cdr: ChangeDetectorRef) {
-    this.fileApi = fileApi;
-    this.cdr = cdr;
-  }
 
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
@@ -58,8 +60,13 @@ export class ObjectFilesTabComponent implements OnDestroy {
 
   @Input() canUpload = false;
 
-  @Output() readonly message = new EventEmitter<UiMessage>();
   @Output() readonly fileChange = new EventEmitter<void>();
+
+  constructor(
+    private readonly fileApi: FileApi,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly toast: ToastService
+  ) {}
 
 
   readonly files$: Observable<ObjectFile[]> = combineLatest([this.object$, this.reload$]).pipe(
@@ -69,12 +76,19 @@ export class ObjectFilesTabComponent implements OnDestroy {
       }
       return this.fileApi.listByObject(object.id).pipe(
         catchError(() => {
-          this.emitMessage('error', 'Не удалось загрузить список файлов.');
+          this.showToast('error', 'Не удалось загрузить список файлов.');
           return of<ObjectFile[]>([]);
         })
       );
     }),
     tap(files => {
+      this.currentFiles = [...files];
+      const availableIds = new Set(files.map(file => file.id));
+      const filteredSelection = new Set(Array.from(this.selectedFiles).filter(id => availableIds.has(id)));
+      if (filteredSelection.size !== this.selectedFiles.size) {
+        this.selectedFiles = filteredSelection;
+        this.cdr.markForCheck();
+      }
       if (this.previewFile && !files.some(file => file.id === this.previewFile?.id)) {
         this.clearPreview();
       }
@@ -87,6 +101,11 @@ export class ObjectFilesTabComponent implements OnDestroy {
   previewLoading = false;
   previewError: string | null = null;
   previewSaving = false;
+  uploadProgressVisible = false;
+  uploadProgressState: UploadProgressState | null = null;
+  selectedFiles = new Set<number>();
+  isExporting = false;
+  currentFiles: ObjectFile[] = [];
 
   refreshFiles(): void {
     this.reload$.next();
@@ -94,11 +113,11 @@ export class ObjectFilesTabComponent implements OnDestroy {
 
   uploadFile(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) {
+    const files = input.files ? Array.from(input.files) : [];
+    if (!files.length) {
       return;
     }
-    this.uploadFiles([file]);
+    this.uploadFiles(files);
     input.value = '';
   }
 
@@ -121,14 +140,14 @@ export class ObjectFilesTabComponent implements OnDestroy {
       )
       .subscribe({
         next: updated => {
-          this.emitMessage('success', 'Файл обновлён.');
+          this.showToast('success', 'Файл обновлён.');
           this.reload$.next();
           this.fileChange.emit(); // 🔹 <— добавь вот это
           if (this.previewFile?.id === targetFile.id) {
             this.selectFile({ ...targetFile, filename: updated.filename, size: updated.size }, true);
           }
         },
-        error: () => this.emitMessage('error', 'Не удалось заменить файл.')
+        error: () => this.showToast('error', 'Не удалось заменить файл.')
       });
 
   }
@@ -142,14 +161,14 @@ export class ObjectFilesTabComponent implements OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.emitMessage('success', 'Файл удалён.');
+          this.showToast('success', 'Файл удалён.');
           if (this.previewFile?.id === file.id) {
             this.clearPreview();
           }
           this.reload$.next();
           this.fileChange.emit();
         },
-        error: () => this.emitMessage('error', 'Не удалось удалить файл.')
+        error: () => this.showToast('error', 'Не удалось удалить файл.')
       });
   }
 
@@ -166,7 +185,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
           anchor.click();
           window.URL.revokeObjectURL(url);
         },
-        error: () => this.emitMessage('error', 'Не удалось скачать файл.')
+        error: () => this.showToast('error', 'Не удалось скачать файл.')
       });
   }
 
@@ -224,18 +243,14 @@ export class ObjectFilesTabComponent implements OnDestroy {
       )
       .subscribe({
         next: updated => {
-          this.emitMessage('success', 'Изменения сохранены.');
+          this.showToast('success', 'Изменения сохранены.');
           this.previewFile = { ...this.previewFile!, filename: updated.filename, size: updated.size };
           this.reload$.next();
           this.fileChange.emit();
           this.selectFile(this.previewFile, true);
         },
-        error: () => this.emitMessage('error', 'Не удалось сохранить файл.')
+        error: () => this.showToast('error', 'Не удалось сохранить файл.')
       });
-  }
-
-  onPreviewMessage(message: UiMessage): void {
-    this.emitMessage(message.type, message.text);
   }
 
   formatSize(size: number): string {
@@ -252,6 +267,40 @@ export class ObjectFilesTabComponent implements OnDestroy {
 
   trackById(_: number, item: ObjectFile): number {
     return item.id;
+  }
+
+  toggleFileSelection(file: ObjectFile, event: Event): void {
+    event.stopPropagation();
+    if (this.isExporting) {
+      return;
+    }
+    const input = event.target as HTMLInputElement;
+    if (input.checked) {
+      this.selectedFiles.add(file.id);
+    } else {
+      this.selectedFiles.delete(file.id);
+    }
+  }
+
+  isMarkedForExport(file: ObjectFile): boolean {
+    return this.selectedFiles.has(file.id);
+  }
+
+  exportSelectedFiles(): void {
+    const files = this.currentFiles.filter(item => this.selectedFiles.has(item.id));
+    if (!files.length) {
+      this.showToast('info', 'Выберите файлы для экспорта.');
+      return;
+    }
+    this.exportFiles(files, true);
+  }
+
+  exportAllFiles(): void {
+    if (!this.currentFiles.length) {
+      this.showToast('info', 'Нет файлов для экспорта.');
+      return;
+    }
+    this.exportFiles(this.currentFiles, false);
   }
 
   @HostListener('document:paste', ['$event'])
@@ -302,14 +351,89 @@ export class ObjectFilesTabComponent implements OnDestroy {
             from(navigator.clipboard.write([item]))
               .pipe(take(1))
               .subscribe({
-                next: () => this.emitMessage('success', 'Файл скопирован в буфер обмена.'),
-                error: () => this.emitMessage('error', 'Не удалось скопировать файл в буфер.')
+                next: () => this.showToast('success', 'Файл скопирован в буфер обмена.'),
+                error: () => this.showToast('error', 'Не удалось скопировать файл в буфер.')
               });
           } else {
-            this.emitMessage('error', 'Текущий браузер не поддерживает копирование файлов.');
+            this.showToast('error', 'Текущий браузер не поддерживает копирование файлов.');
           }
         },
-        error: () => this.emitMessage('error', 'Не удалось получить файл для копирования.')
+        error: () => this.showToast('error', 'Не удалось получить файл для копирования.')
+      });
+  }
+
+  private exportFiles(files: ObjectFile[], clearSelection: boolean): void {
+    if (!files.length) {
+      return;
+    }
+    if (files.length === 1) {
+      this.downloadFile(files[0]);
+      if (clearSelection) {
+        this.selectedFiles.delete(files[0].id);
+        this.cdr.markForCheck();
+      }
+      return;
+    }
+    this.isExporting = true;
+    this.cdr.markForCheck();
+    const object = this.object$.value;
+    const builder = new ZipBuilder();
+    const successful: ObjectFile[] = [];
+    from(files)
+      .pipe(
+        concatMap(file =>
+          this.fileApi.download(file.id).pipe(
+            switchMap(blob => from(blob.arrayBuffer())),
+            map(buffer => ({ file, data: new Uint8Array(buffer) })),
+            catchError(() => {
+              this.showToast('error', `Не удалось экспортировать файл «${file.filename}».`);
+              return of(null);
+            })
+          )
+        ),
+        takeUntil(this.destroy$),
+        finalize(() => {
+          this.isExporting = false;
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: result => {
+          if (!result) {
+            return;
+          }
+          builder.addFile(result.file.filename, result.data);
+          successful.push(result.file);
+        },
+        complete: () => {
+          if (!successful.length) {
+            this.showToast('error', 'Не удалось подготовить архив для экспорта.');
+            return;
+          }
+          const zipBytes = builder.build();
+          const blob = new Blob([zipBytes], { type: 'application/zip' });
+          const url = window.URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          const objectId = object?.id;
+          const timestamp = new Date().toISOString().slice(0, 10);
+          anchor.href = url;
+          anchor.download = `object-${objectId ?? 'files'}-${timestamp}.zip`;
+          anchor.click();
+          window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+          if (clearSelection) {
+            const exportedIds = new Set(successful.map(file => file.id));
+            this.selectedFiles = new Set(
+              Array.from(this.selectedFiles).filter(id => !exportedIds.has(id))
+            );
+            this.cdr.markForCheck();
+          }
+          const successMessage =
+            successful.length === files.length
+              ? 'Архив с файлами успешно сформирован.'
+              : `Архив сформирован частично: ${successful.length} из ${files.length} файлов.`;
+          this.showToast('success', successMessage);
+        },
+        error: () => this.showToast('error', 'Не удалось экспортировать файлы.')
       });
   }
 
@@ -319,22 +443,35 @@ export class ObjectFilesTabComponent implements OnDestroy {
       return;
     }
     this.isUploading = true;
+    this.showUploadProgress(files.length);
     from(files)
       .pipe(
-        concatMap(file =>
-          this.fileApi.upload(object.id, file).pipe(
-            tap(() => this.emitMessage('success', `Файл «${file.name}» загружен.`)),
+        concatMap((file, index) =>
+          this.fileApi.uploadWithProgress(object.id, file).pipe(
+            tap(event => {
+              if (event.type === HttpEventType.UploadProgress) {
+                const percent = event.total ? (event.loaded / event.total) * 100 : 0;
+                this.updateUploadProgress(file.name, index, percent);
+              }
+              if (event.type === HttpEventType.Response) {
+                this.updateUploadProgress(file.name, index, 100, true);
+              }
+            }),
+            last(event => event.type === HttpEventType.Response),
+            map(event => event.body as ObjectFile),
+            tap(() => this.showToast('success', `Файл «${file.name}» загружен.`)),
             catchError(() => {
-              this.emitMessage('error', `Не удалось загрузить файл «${file.name}».`);
+              this.showToast('error', `Не удалось загрузить файл «${file.name}».`);
+              this.updateUploadProgress(file.name, index, 100, true);
               return of(null);
             })
           )
         ),
+        takeUntil(this.destroy$),
         finalize(() => {
           this.isUploading = false;
-          this.cdr.markForCheck();
-        }),
-        takeUntil(this.destroy$)
+          this.hideUploadProgress();
+        })
       )
       .subscribe({
         next: result => {
@@ -343,12 +480,54 @@ export class ObjectFilesTabComponent implements OnDestroy {
             this.fileChange.emit();
           }
         },
-        error: () => this.emitMessage('error', 'Во время загрузки произошла ошибка.')
+        error: () => this.showToast('error', 'Во время загрузки произошла ошибка.')
       });
   }
 
-  private emitMessage(type: UiMessage['type'], text: string): void {
-    this.message.emit({ type, text });
+  private showUploadProgress(totalFiles: number): void {
+    this.uploadProgressState = {
+      totalFiles,
+      completedFiles: 0,
+      currentFileName: '',
+      currentFilePercent: 0,
+      overallPercent: totalFiles ? 0 : 100
+    };
+    this.uploadProgressVisible = true;
+    this.cdr.markForCheck();
+  }
+
+  private updateUploadProgress(fileName: string, fileIndex: number, percent: number, isComplete = false): void {
+    if (!this.uploadProgressState) {
+      return;
+    }
+    const totalFiles = this.uploadProgressState.totalFiles;
+    const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+    const completedFiles = Math.min(totalFiles, isComplete ? fileIndex + 1 : fileIndex);
+    const partialContribution = isComplete ? 0 : clampedPercent;
+    const overallPercent = totalFiles
+      ? Math.min(100, Math.round(((completedFiles * 100) + partialContribution) / totalFiles))
+      : 100;
+    this.uploadProgressState = {
+      totalFiles,
+      completedFiles,
+      currentFileName: fileName,
+      currentFilePercent: isComplete ? 100 : clampedPercent,
+      overallPercent
+    };
+    this.cdr.markForCheck();
+  }
+
+  private hideUploadProgress(): void {
+    if (!this.uploadProgressVisible) {
+      return;
+    }
+    this.uploadProgressVisible = false;
+    this.uploadProgressState = null;
+    this.cdr.markForCheck();
+  }
+
+  private showToast(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 
   private clearPreview(): void {

@@ -23,6 +23,15 @@
       align-items: flex-start;
       min-width: 0;
 
+      .form-check {
+        margin: 0;
+        padding: 0;
+      }
+
+      .form-check-input {
+        margin-top: 0.35rem;
+      }
+
       .fw-semibold {
         word-break: break-all;
       }
@@ -52,5 +61,35 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+}
+
+.upload-progress-modal {
+  z-index: 1075;
+
+  .modal-content {
+    border-radius: 1rem;
+    box-shadow: 0 1rem 2rem rgba(15, 23, 42, 0.2);
+  }
+
+  .modal-header {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .modal-body {
+    padding-top: 0.5rem;
+  }
+
+  .progress {
+    height: 0.75rem;
+    border-radius: 1rem;
+    background-color: rgba(13, 110, 253, 0.15);
+  }
+
+  .progress-bar {
+    background: linear-gradient(90deg, #0d6efd, #6f42c1);
+    font-size: 0.75rem;
+    font-weight: 600;
   }
 }

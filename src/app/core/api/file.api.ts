@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpEventType } from '@angular/common/http';
+import { filter, map } from 'rxjs/operators';
 
 import { ApiHttpService } from '../services/api-http.service';
 import { ObjectFile } from '../models/object.model';
@@ -32,10 +33,20 @@ export class FileApi {
   }
 
   upload(objectId: number, file: File): Observable<ObjectFile> {
+    return this.uploadWithProgress(objectId, file).pipe(
+      filter(event => event.type === HttpEventType.Response),
+      map(event => event.body as ObjectFile)
+    );
+  }
+
+  uploadWithProgress(objectId: number, file: File): Observable<HttpEvent<ObjectFile>> {
     const formData = new FormData();
     formData.append('objectId', String(objectId));
     formData.append('file', file);
-    return this.rawHttp.post<ObjectFile>(this.http.resolveUrl(`${this.baseUrl}/upload`), formData);
+    return this.rawHttp.post<ObjectFile>(this.http.resolveUrl(`${this.baseUrl}/upload`), formData, {
+      reportProgress: true,
+      observe: 'events'
+    });
   }
 
   linkMetadata(payload: ObjectFile): Observable<ObjectFile> {

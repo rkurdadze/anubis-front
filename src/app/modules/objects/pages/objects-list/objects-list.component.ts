@@ -11,7 +11,7 @@ import { ClassApi } from '../../../../core/api/class.api';
 import { RepositoryObject, RepositoryObjectRequest } from '../../../../core/models/object.model';
 import { ObjectClass } from '../../../../core/models/class.model';
 import { ObjectType } from '../../../../core/models/object-type.model';
-import { UiMessageService, UiMessage } from '../../../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../../../shared/services/toast.service';
 import {Page} from '../../../../core/models/page.model';
 
 interface ObjectsListItem extends RepositoryObject {
@@ -32,7 +32,7 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   private readonly objectApi = inject(ObjectApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly classApi = inject(ClassApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<number>(0);
 
@@ -48,8 +48,6 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     typeId: [null as number | null, Validators.required],
     classId: [null as number | null]
   });
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     catchError(() => {
@@ -172,7 +170,6 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 
   toggleCreatePanel(): void {
@@ -289,15 +286,11 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
       });
   }
 
-  dismissMessage(): void {
-    this.uiMessages.dismiss();
-  }
-
   trackByObjectId(index: number, item: ObjectsListItem): number {
     return item.id;
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 }

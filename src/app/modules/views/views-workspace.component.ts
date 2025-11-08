@@ -8,7 +8,7 @@ import { ObjectViewApi } from '../../core/api/view.api';
 import { ObjectView } from '../../core/models/object-view.model';
 import { RepositoryObject } from '../../core/models/object.model';
 import { ObjectVersion } from '../../core/models/object-version.model';
-import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 
 @Component({
   selector: 'app-views-workspace',
@@ -21,7 +21,7 @@ import { UiMessageService, UiMessage } from '../../shared/services/ui-message.se
 export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly objectViewApi = inject(ObjectViewApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly viewsSubject = new BehaviorSubject<ObjectView[]>([]);
   private readonly resultsSubject = new BehaviorSubject<RepositoryObject[]>([]);
@@ -32,7 +32,6 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   readonly views$ = this.viewsSubject.asObservable();
   readonly executionResults$ = this.resultsSubject.asObservable();
   readonly aclResults$ = this.aclResultsSubject.asObservable();
-  readonly message$ = this.uiMessages.message$;
 
   readonly userForm = this.fb.group({
     userId: [1, [Validators.required, Validators.min(1)]],
@@ -298,13 +297,12 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     }
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 }

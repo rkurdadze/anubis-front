@@ -1,0 +1,43 @@
+.app-toast-container {
+  z-index: 1080;
+  pointer-events: none;
+
+  .app-toast {
+    pointer-events: auto;
+    min-width: 320px;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.5rem 1rem rgba(18, 38, 63, 0.18);
+    border: none;
+    color: #fff;
+
+    &.toast--success {
+      background: linear-gradient(135deg, #198754, #25a065);
+    }
+
+    &.toast--error {
+      background: linear-gradient(135deg, #dc3545, #f05b6b);
+    }
+
+    &.toast--warning {
+      background: linear-gradient(135deg, #f59f00, #f7b733);
+    }
+
+    &.toast--info {
+      background: linear-gradient(135deg, #0d6efd, #4589ff);
+    }
+
+    .toast-body {
+      color: inherit;
+      font-weight: 500;
+
+      i {
+        font-size: 1.25rem;
+        margin-top: 0.1rem;
+      }
+
+      .btn-close {
+        filter: invert(1);
+      }
+    }
+  }
+}

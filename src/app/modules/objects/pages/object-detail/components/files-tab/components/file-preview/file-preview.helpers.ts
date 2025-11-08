@@ -243,8 +243,17 @@ export class ZipArchive {
 export class ZipBuilder {
   private files: { name: string; data: Uint8Array; crc: number }[] = [];
 
-  addFile(name: string, content: string): void {
-    const data = new TextEncoder().encode(content);
+  addFile(name: string, content: string | Uint8Array | ArrayBuffer): void {
+    let data: Uint8Array;
+    if (typeof content === 'string') {
+      data = new TextEncoder().encode(content);
+    } else if (content instanceof Uint8Array) {
+      data = content;
+    } else if (content instanceof ArrayBuffer) {
+      data = new Uint8Array(content);
+    } else {
+      throw new Error('Unsupported ZIP content type');
+    }
     const crc = crc32(data);
     this.files.push({ name, data, crc });
   }

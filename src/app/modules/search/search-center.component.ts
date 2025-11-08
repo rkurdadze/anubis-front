@@ -5,7 +5,7 @@ import { BehaviorSubject, Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, takeUntil, tap } from 'rxjs/operators';
 
 import { SearchApi } from '../../core/api/search.api';
-import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 
 @Component({
   selector: 'app-search-center',
@@ -18,12 +18,11 @@ import { UiMessageService, UiMessage } from '../../shared/services/ui-message.se
 export class SearchCenterComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly searchApi = inject(SearchApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly resultsSubject = new BehaviorSubject<number[]>([]);
 
   readonly results$ = this.resultsSubject.asObservable();
-  readonly message$ = this.uiMessages.message$;
 
   readonly searchForm = this.fb.group({
     query: ['', [Validators.required, Validators.minLength(3)]],
@@ -128,13 +127,12 @@ export class SearchCenterComponent implements OnDestroy {
     return item;
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 }

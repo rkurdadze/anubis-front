@@ -28,7 +28,7 @@ import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-browser';
 
 import { ObjectFile } from '../../../../../../../../core/models/object.model';
-import { UiMessage } from '../../../../../../../../shared/services/ui-message.service';
+import { ToastService } from '../../../../../../../../shared/services/toast.service';
 import {
   FilePreviewPage,
   FilePreviewState,
@@ -73,6 +73,7 @@ export class FilePreviewComponent implements OnInit, OnChanges, AfterViewInit, O
   private static readonly MAX_STAGE = 560;
   private readonly sanitizer = inject(DomSanitizer);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly toast = inject(ToastService);
 
   @Input() file: ObjectFile | null = null;
   @Input() blob: Blob | null = null;
@@ -81,7 +82,6 @@ export class FilePreviewComponent implements OnInit, OnChanges, AfterViewInit, O
   @Input() saving = false;
 
   @Output() readonly saveFile = new EventEmitter<File>();
-  @Output() readonly message = new EventEmitter<UiMessage>();
 
   @ViewChild('stage', { static: false }) stageRef?: ElementRef<HTMLDivElement>;
   @ViewChild('previewWrapper', { static: false }) previewWrapper?: ElementRef<HTMLDivElement>;
@@ -644,7 +644,7 @@ export class FilePreviewComponent implements OnInit, OnChanges, AfterViewInit, O
       this.saveFile.emit(file);
     } catch (error) {
       console.error(error);
-      this.message.emit({ type: 'error', text: 'Не удалось подготовить изменения файла.' });
+      this.toast.error('Не удалось подготовить изменения файла.');
     }
   }
 

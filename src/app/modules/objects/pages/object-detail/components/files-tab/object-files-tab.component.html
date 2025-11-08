@@ -3,13 +3,41 @@
     <div class="card border-0 anubis-shadow h-100">
       <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
         <h3 class="h6 mb-0">Файлы объекта</h3>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refreshFiles()">
             <i class="fa-solid fa-rotate-right me-1"></i>
             Обновить
           </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            (click)="exportSelectedFiles()"
+            [disabled]="selectedFiles.size === 0 || isExporting"
+          >
+            <span *ngIf="isExporting" class="spinner-border spinner-border-sm me-1"></span>
+            <i class="fa-solid fa-file-export me-1"></i>
+            Экспорт выбранных
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            (click)="exportAllFiles()"
+            [disabled]="!currentFiles.length || isExporting"
+          >
+            <i class="fa-solid fa-box-archive me-1"></i>
+            Экспорт всех
+          </button>
+          <span *ngIf="selectedFiles.size" class="badge bg-primary-subtle text-primary">
+            Выбрано: {{ selectedFiles.size }}
+          </span>
           <label class="btn btn-primary btn-sm mb-0" [class.disabled]="!canUpload || isUploading">
-            <input type="file" class="d-none" (change)="uploadFile($event)" [disabled]="!canUpload || isUploading" />
+            <input
+              type="file"
+              class="d-none"
+              (change)="uploadFile($event)"
+              [disabled]="!canUpload || isUploading"
+              multiple
+            />
             <span *ngIf="isUploading" class="spinner-border spinner-border-sm me-1"></span>
             <i class="fa-solid fa-upload me-1"></i>
             Загрузить
@@ -29,6 +57,16 @@
               (click)="selectFile(file)"
             >
               <div class="file-list__meta">
+                <div class="form-check form-check-inline me-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    aria-label="Выбрать файл для экспорта"
+                    [checked]="isMarkedForExport(file)"
+                    (change)="toggleFileSelection(file, $event)"
+                    [disabled]="isExporting"
+                  />
+                </div>
                 <div class="file-icon">
                   <i [ngClass]="getFileIconClass(file)"></i>
                 </div>
@@ -74,7 +112,36 @@
       [error]="previewError"
       [saving]="previewSaving"
       (saveFile)="onSaveFile($event)"
-      (message)="onPreviewMessage($event)"
     ></app-file-preview>
   </div>
 </div>
+
+<ng-container *ngIf="uploadProgressVisible && uploadProgressState as progress">
+  <div class="modal-backdrop fade show"></div>
+  <div class="modal fade show d-block upload-progress-modal" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title mb-0">Загрузка файлов</h5>
+        </div>
+        <div class="modal-body">
+          <p class="mb-1">
+            {{ progress.completedFiles === progress.totalFiles ? 'Все файлы загружены.' : 'Идёт загрузка файлов.' }}
+          </p>
+          <p class="text-muted small mb-3" *ngIf="progress.currentFileName">
+            Текущий файл: <strong>{{ progress.currentFileName }}</strong>
+          </p>
+          <div class="progress mb-2">
+            <div class="progress-bar" role="progressbar" [style.width.%]="progress.overallPercent">
+              {{ progress.overallPercent }}%
+            </div>
+          </div>
+          <div class="d-flex justify-content-between text-muted small">
+            <span>Файлов обработано: {{ progress.completedFiles }} из {{ progress.totalFiles }}</span>
+            <span>{{ progress.currentFilePercent }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-container>

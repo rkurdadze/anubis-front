@@ -8,7 +8,7 @@ import { ObjectTypeApi } from '../../core/api/object-type.api';
 import { ObjectType, SaveObjectTypePayload } from '../../core/models/object-type.model';
 import { VaultApi } from '../../core/api/vault.api';
 import { Vault } from '../../core/models/vault.model';
-import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 
 @Component({
   selector: 'app-object-types-list',
@@ -22,7 +22,7 @@ export class ObjectTypesListComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly vaultApi = inject(VaultApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private availableVaults: Vault[] = [];
@@ -38,8 +38,6 @@ export class ObjectTypesListComponent implements OnDestroy {
     name: ['', [Validators.required, Validators.maxLength(255)]],
     vaultId: [null as number | null, Validators.required]
   });
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly vaults$ = this.reloadVaults$.pipe(
     switchMap(() =>
@@ -106,7 +104,6 @@ export class ObjectTypesListComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 
   refresh(): void {
@@ -252,8 +249,8 @@ export class ObjectTypesListComponent implements OnDestroy {
     return item.id;
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 
   private getDefaultVaultId(): number | null {

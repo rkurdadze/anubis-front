@@ -33,11 +33,6 @@
     </div>
   </section>
 
-  <div *ngIf="message$ | async as message" class="alert"
-       [ngClass]="message.type === 'success' ? 'alert-success' : message.type === 'warning' ? 'alert-warning' : message.type === 'info' ? 'alert-info' : 'alert-danger'">
-    {{ message.text }}
-  </div>
-
   <div class="row g-4 align-items-start">
     <div class="col-12 col-lg-7">
       <div class="card border-0 anubis-shadow h-100">

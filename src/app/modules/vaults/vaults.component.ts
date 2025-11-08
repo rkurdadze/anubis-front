@@ -10,7 +10,7 @@ import { VaultApi } from '../../core/api/vault.api';
 import { FileStorageApi } from '../../core/api/file-storage.api';
 import { FileStorage } from '../../core/models/file-storage.model';
 import { SaveVaultPayload, Vault } from '../../core/models/vault.model';
-import { UiMessage, UiMessageService } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 import { StorageKind } from '../../core/models/storage-kind.enum';
 
 interface VaultMetrics {
@@ -39,7 +39,7 @@ export class VaultsComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly vaultApi = inject(VaultApi);
   private readonly fileStorageApi = inject(FileStorageApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
 
   private readonly vaultsSubject = new BehaviorSubject<Vault[]>([]);
   private readonly storagesSubject = new BehaviorSubject<FileStorage[]>([]);
@@ -59,8 +59,6 @@ export class VaultsComponent implements OnDestroy {
     isActive: this.fb.nonNullable.control(true),
     defaultStorageId: this.fb.control<number | null>(null)
   });
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly vaults$ = this.vaultsSubject.asObservable();
   readonly storages$ = this.storagesSubject.asObservable();
@@ -147,7 +145,9 @@ export class VaultsComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.uiMessages.destroy();
+    this.vaultsSubject.complete();
+    this.storagesSubject.complete();
+    this.selectedVaultIdSubject.complete();
   }
 
   trackByVaultId(_: number, vault: Vault): number {
@@ -410,7 +410,7 @@ export class VaultsComponent implements OnDestroy {
     };
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 }

@@ -14,7 +14,7 @@ import {
 } from '../../core/models/class.model';
 import { ObjectType } from '../../core/models/object-type.model';
 import { PropertyDefinition } from '../../core/models/property-def.model';
-import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 
 @Component({
   selector: 'app-classes-overview',
@@ -29,7 +29,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   private readonly classApi = inject(ClassApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private readonly bindingsReload$ = new BehaviorSubject<number | null>(null);
@@ -61,8 +61,6 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
     isHidden: [false],
     displayOrder: [0]
   });
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     catchError(() => {
@@ -168,7 +166,6 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 
   selectClass(cls: ObjectClass): void {
@@ -396,7 +393,7 @@ export class ClassesOverviewComponent implements OnInit, OnDestroy {
     this.reload$.next();
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 }

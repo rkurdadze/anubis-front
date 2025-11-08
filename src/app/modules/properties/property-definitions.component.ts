@@ -11,7 +11,7 @@ import { PropertyDefinition, PropertyDefinitionRequest } from '../../core/models
 import { ObjectType } from '../../core/models/object-type.model';
 import { ValueList } from '../../core/models/value-list.model';
 import { PropertyDataType } from '../../core/models/property-data-type.enum';
-import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 
 @Component({
   selector: 'app-property-definitions',
@@ -26,7 +26,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
   private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly valueListApi = inject(ValueListApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   editingProperty: PropertyDefinition | null = null;
@@ -52,8 +52,6 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
     description: [''],
     captionI18n: ['']
   });
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     catchError(() => {
@@ -159,7 +157,6 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 
   startCreate(): void {
@@ -384,7 +381,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 }

@@ -6,7 +6,7 @@ import { catchError, map, shareReplay, startWith, switchMap, takeUntil } from 'r
 
 import { ValueListApi } from '../../core/api/value-list.api';
 import { ValueList, ValueListItem } from '../../core/models/value-list.model';
-import { UiMessageService, UiMessage } from '../../shared/services/ui-message.service';
+import { ToastService, ToastType } from '../../shared/services/toast.service';
 
 @Component({
   selector: 'app-value-lists-overview',
@@ -19,7 +19,7 @@ import { UiMessageService, UiMessage } from '../../shared/services/ui-message.se
 export class ValueListsOverviewComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly valueListApi = inject(ValueListApi);
-  private readonly uiMessages = inject(UiMessageService).create({ autoClose: true, duration: 5000 });
+  private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private readonly itemsReload$ = new BehaviorSubject<void>(undefined);
@@ -46,8 +46,6 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
     externalCode: [''],
     isActive: [true]
   });
-
-  readonly message$ = this.uiMessages.message$;
 
   readonly valueLists$ = this.reload$.pipe(
     switchMap(() =>
@@ -128,7 +126,6 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.uiMessages.destroy();
   }
 
   selectList(list: ValueList): void {
@@ -377,7 +374,7 @@ export class ValueListsOverviewComponent implements OnInit, OnDestroy {
     }
   }
 
-  private showMessage(type: UiMessage['type'], text: string): void {
-    this.uiMessages.show({ type, text });
+  private showMessage(type: ToastType, text: string): void {
+    this.toast.show(type, text);
   }
 }
