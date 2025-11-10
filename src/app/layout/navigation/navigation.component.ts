@@ -1,8 +1,11 @@
-import {ChangeDetectionStrategy, Component, DestroyRef, OnInit} from '@angular/core';
+import {ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, inject, OnInit} from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { NgClass, NgFor } from '@angular/common';
-import {SocketService} from '../../core/socket.service';
+import {AsyncPipe, NgClass, NgFor, NgIf, NgSwitch, NgSwitchCase} from '@angular/common';
+import {SocketService, WsState} from '../../core/socket.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {FileSocketService} from '../../core/services/FileSocketService';
+import {ToastService} from '../../shared/services/toast.service';
+import {Observable} from 'rxjs';
 
 interface NavItem {
   label: string;
@@ -13,7 +16,7 @@ interface NavItem {
 @Component({
   selector: 'app-navigation',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, NgFor, NgClass],
+  imports: [RouterLink, RouterLinkActive, NgFor, NgClass, NgSwitch, NgSwitchCase, AsyncPipe, NgIf],
   templateUrl: './navigation.component.html',
   styleUrls: ['./navigation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -36,22 +39,32 @@ export class NavigationComponent implements OnInit{
     { label: 'Поиск', icon: 'fa-solid fa-magnifying-glass', route: '/search' }
   ];
 
-  isConnected = false;
+  private readonly toast = inject(ToastService);
+  state: WsState = 'disconnected'; // 🔹 дефолт
 
   constructor(
     private readonly socketService: SocketService,
-    private readonly destroyRef: DestroyRef
+    private readonly destroyRef: DestroyRef,
+    private readonly fileSocket: FileSocketService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
+    // WebSocket состояние
     this.socketService.connection$()
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(connected => {
-        this.isConnected = connected;
-        console.log(connected ? '🟢 WS подключён' : '🔴 WS отключён');
+      .subscribe(state => {
+        this.state = state;
+        this.cdr.markForCheck(); // 🔥 заставляем Angular обновить шаблон
+      });
+
+    // Подписка на файлы
+    this.fileSocket
+      .watchAllFiles()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(msg => {
+        this.toast.info(`Файл #${msg.fileId} → ${msg.status}`);
       });
   }
-
-
 
 }

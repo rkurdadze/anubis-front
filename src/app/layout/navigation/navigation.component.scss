@@ -39,3 +39,27 @@
 .nav-link i {
   font-size: 1.1rem;
 }
+
+
+.status-dot {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: gray;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+
+  &--connected {
+    background-color: #28a745;
+  }
+  &--connecting {
+    background-color: #ffc107;
+    animation: pulse 1.2s infinite;
+  }
+  &--disconnected {
+    background-color: #dc3545;
+  }
+}
