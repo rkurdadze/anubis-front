@@ -1,6 +1,8 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {ChangeDetectionStrategy, Component, DestroyRef, OnInit} from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { NgClass, NgFor } from '@angular/common';
+import {SocketService} from '../../core/socket.service';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
 interface NavItem {
   label: string;
@@ -16,7 +18,7 @@ interface NavItem {
   styleUrls: ['./navigation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class NavigationComponent {
+export class NavigationComponent implements OnInit{
   readonly items: NavItem[] = [
     { label: 'Панель управления', icon: 'fa-solid fa-gauge-high', route: '/dashboard' },
     { label: 'Файловые хранилища', icon: 'fa-solid fa-server', route: '/file-storages' },
@@ -33,4 +35,23 @@ export class NavigationComponent {
     { label: 'Представления', icon: 'fa-solid fa-folder-tree', route: '/views' },
     { label: 'Поиск', icon: 'fa-solid fa-magnifying-glass', route: '/search' }
   ];
+
+  isConnected = false;
+
+  constructor(
+    private readonly socketService: SocketService,
+    private readonly destroyRef: DestroyRef
+  ) {}
+
+  ngOnInit(): void {
+    this.socketService.connection$()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(connected => {
+        this.isConnected = connected;
+        console.log(connected ? '🟢 WS подключён' : '🔴 WS отключён');
+      });
+  }
+
+
+
 }

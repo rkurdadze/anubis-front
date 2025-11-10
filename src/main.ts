@@ -13,6 +13,27 @@ if (environment.production) {
   enableProdMode();
 }
 
+const originalConsoleError = console.error;
+
+console.error = function (...args) {
+  const errorMessage = args[0]?.toString() || '';
+
+  // Suppress AG Grid Enterprise License Warnings and Errors Containing '**********'
+  if (
+    errorMessage.includes('AG Grid Enterprise License') ||
+    errorMessage.includes('****************************************') ||
+    errorMessage.includes('All AG Grid Enterprise features are unlocked for trial') ||
+    errorMessage.includes('hide the watermark') ||
+    errorMessage.includes('ResizeObserver loop completed with undelivered notifications')
+  ) {
+    return;
+  }
+
+  // Call the original console.error for other errors
+  originalConsoleError.apply(console, args);
+};
+
+
 bootstrapApplication(AppComponent, {
   providers: [
     provideRouter(routes),

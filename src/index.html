@@ -19,6 +19,13 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     />
+    <script>
+      // ✅ Define `global` before any ESM import (SockJS fix)
+      if (typeof global === 'undefined') {
+        window.global = window;
+      }
+    </script>
+
   </head>
   <body>
     <app-root></app-root>
