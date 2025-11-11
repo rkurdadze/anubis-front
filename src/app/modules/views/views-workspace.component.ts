@@ -1,5 +1,5 @@
 import { AsyncPipe, DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import {ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit, inject, Input} from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, of } from 'rxjs';
 import { catchError, map, takeUntil, tap } from 'rxjs/operators';
@@ -12,8 +12,9 @@ import { PropertyDefinitionApi } from '../../core/api/property-def.api';
 import { PropertyDefinition } from '../../core/models/property-def.model';
 import { PropertyDataType } from '../../core/models/property-data-type.enum';
 import { ToastService, ToastType } from '../../shared/services/toast.service';
+import {FilterGroupComponent} from './form-group/filter-group.component';
 
-interface FilterOperatorConfig {
+export interface FilterOperatorConfig {
   value: string;
   label: string;
   requiresValue: boolean;
@@ -23,7 +24,7 @@ interface FilterOperatorConfig {
 @Component({
   selector: 'app-views-workspace',
   standalone: true,
-  imports: [AsyncPipe, NgIf, NgFor, NgClass, ReactiveFormsModule, DatePipe],
+  imports: [AsyncPipe, NgIf, NgFor, NgClass, ReactiveFormsModule, DatePipe, FilterGroupComponent],
   templateUrl: './views-workspace.component.html',
   styleUrls: ['./views-workspace.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -60,11 +61,10 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     groupingsJson: ['']
   });
 
-  readonly filterBuilderForm = this.fb.group({
-    isEnabled: [false],
-    operator: ['AND'],
-    conditions: this.fb.array([])
-  });
+
+  @Input() operators: { value: string; symbol: string; label: string }[] = [];
+
+
 
   private readonly filterOperators: FilterOperatorConfig[] = [
     { value: 'EQ', label: 'Равно', requiresValue: true },
@@ -101,6 +101,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   isSaving = false;
   isLoading = false;
   isExecuting = false;
+
 
   ngOnInit(): void {
     this.resetFilterBuilder();
@@ -211,12 +212,10 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const filter = this.buildFilterPayload();
-    if (filter === null) {
-      return;
-    }
+    const filter = this.filterBuilderForm.get('isEnabled')?.value
+      ? this.buildFilterJson(this.rootGroup)
+      : undefined;
 
-    // ✅ больше не сериализуем в строку!
     this.viewForm.patchValue({ filterJson: filter });
 
     const groupings = this.parseJson(this.viewForm.value.groupingsJson ?? '', true);
@@ -385,8 +384,10 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   get filterConditions(): FormArray<FormGroup> {
-    return this.filterBuilderForm.get('conditions') as FormArray<FormGroup>;
+    const root = this.filterBuilderForm.get('rootGroup') as FormGroup;
+    return root.get('conditions') as FormArray<FormGroup>;
   }
+
 
   get filterOperatorOptions(): FilterOperatorConfig[] {
     return this.filterOperators;
@@ -461,11 +462,18 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   private resetFilterBuilder(): void {
-    this.filterBuilderForm.patchValue({ isEnabled: false, operator: 'AND' });
-    this.filterConditions.clear();
+    const root = this.filterBuilderForm.get('rootGroup') as FormGroup;
+    const conditions = root.get('conditions') as FormArray;
+
+    this.filterBuilderForm.patchValue({ isEnabled: false });
+    root.patchValue({ operator: 'AND' });
+    conditions.clear();
   }
 
-  private populateFilterBuilder(filterJson: ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null | undefined): void {
+
+  private populateFilterBuilder(
+    filterJson: ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null | undefined
+  ): void {
     if (!filterJson) {
       this.resetFilterBuilder();
       return;
@@ -477,14 +485,20 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.filterBuilderForm.patchValue({ isEnabled: true, operator: normalized.operator });
-    this.filterConditions.clear();
-    normalized.conditions.forEach(c => this.addCondition(c));
+    const root = this.filterBuilderForm.get('rootGroup') as FormGroup;
+    const conditions = root.get('conditions') as FormArray;
 
-    if (this.filterConditions.length === 0) {
-      this.addCondition();
+    this.filterBuilderForm.patchValue({ isEnabled: true });
+    root.patchValue({ operator: normalized.operator });
+    conditions.clear();
+
+    normalized.conditions.forEach(c => conditions.push(this.createConditionGroup(c)));
+
+    if (conditions.length === 0) {
+      conditions.push(this.createConditionGroup());
     }
   }
+
 
 
   private normalizeFilterJson(json: string): { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null {
@@ -592,12 +606,20 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     return String(value);
   }
 
-  private buildFilterPayload(): ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | undefined | null {
+  private buildFilterPayload():
+    | ObjectViewFilterCondition
+    | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] }
+    | undefined
+    | null {
     if (!this.filterBuilderForm.get('isEnabled')!.value) {
       return undefined;
     }
 
-    if (this.filterConditions.length === 0) {
+    const root = this.filterBuilderForm.get('rootGroup') as FormGroup;
+    const conditionsArray = root.get('conditions') as FormArray;
+    const operatorControl = root.get('operator');
+
+    if (conditionsArray.length === 0) {
       this.showMessage('error', 'Добавьте хотя бы одно условие фильтра или отключите фильтр.');
       return null;
     }
@@ -605,7 +627,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     const conditions: ObjectViewFilterCondition[] = [];
     let hasErrors = false;
 
-    this.filterConditions.controls.forEach(control => {
+    conditionsArray.controls.forEach(control => {
       const condition = this.prepareCondition(control);
       if (!condition) {
         hasErrors = true;
@@ -623,19 +645,14 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       return undefined;
     }
 
-    const operatorControl = this.filterBuilderForm.get('operator');
-    const operatorValue = typeof operatorControl?.value === 'string' ? operatorControl.value.toUpperCase() : 'AND';
-    const operator: 'AND' | 'OR' = operatorValue === 'OR' ? 'OR' : 'AND';
-
+    const operatorValue = ((operatorControl?.value as string | undefined)?.toUpperCase() ?? 'AND') as 'AND' | 'OR';
     if (conditions.length === 1) {
       return conditions[0];
     }
 
-    return {
-      operator,
-      conditions
-    };
+    return { operator: operatorValue, conditions };
   }
+
 
   private prepareCondition(control: AbstractControl): ObjectViewFilterCondition | null {
     const group = control as FormGroup;
@@ -731,4 +748,80 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
   }
+
+
+  getFilterOperatorLabel(op: string | undefined): string {
+    if (!op) return '—';
+    return op === 'OR' ? 'ИЛИ' : 'И';
+  }
+
+  getFilterConditions(
+    filter: ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] }
+  ): ObjectViewFilterCondition[] {
+    if (!filter) return [];
+    if ('conditions' in filter) {
+      return filter.conditions;
+    }
+    return [filter];
+  }
+
+  getFilterOperatorLabelSafe(filter: any): string {
+    if (filter && typeof filter === 'object' && 'operator' in filter) {
+      return this.getFilterOperatorLabel(filter.operator);
+    }
+    return this.getFilterOperatorLabel(undefined);
+  }
+
+  readonly filterBuilderForm = this.fb.group({
+    isEnabled: [false],
+    rootGroup: this.createFilterGroup()
+  });
+
+
+
+  createFilterGroup(initial?: any): FormGroup {
+    return this.fb.group({
+      operator: [initial?.operator ?? 'AND'],
+      conditions: this.fb.array(
+        (initial?.conditions ?? []).map((c: any) =>
+          this.isGroup(c)
+            ? this.createFilterGroup(c)
+            : this.createConditionGroup(c)
+        )
+      )
+    });
+  }
+
+  isGroup(item: any): boolean {
+    return item && typeof item === 'object' && 'conditions' in item;
+  }
+
+  get rootGroup(): FormGroup {
+    return this.filterBuilderForm.get('rootGroup') as FormGroup;
+  }
+
+  private buildFilterJson(group: FormGroup): any {
+    const operator = group.get('operator')?.value ?? 'AND';
+    const conditions = group.get('conditions') as FormArray;
+
+    return {
+      operator,
+      conditions: conditions.controls.map(ctrl => {
+        if (ctrl.get('conditions')) {
+          // Подгруппа
+          return this.buildFilterJson(ctrl as FormGroup);
+        }
+        // Простое условие
+        return {
+          propertyDefId: ctrl.get('propertyDefId')?.value,
+          op: ctrl.get('op')?.value,
+          value: ctrl.get('value')?.value,
+          valueTo: ctrl.get('valueTo')?.value
+        };
+      })
+    };
+  }
+
+
+
 }

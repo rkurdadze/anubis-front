@@ -1,0 +1,54 @@
+<div class="filter-group level-{{level}}" [formGroup]="group">
+  <div class="filter-group__header">
+    <div class="input-group input-group-sm w-auto">
+      <span class="input-group-text">Группа</span>
+      <select class="form-select" formControlName="operator">
+        <option value="AND">И</option>
+        <option value="OR">ИЛИ</option>
+      </select>
+    </div>
+
+    <div class="btn-group btn-group-sm">
+      <button type="button" class="btn btn-outline-primary" (click)="addCondition()">+ Условие</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="addGroup()">+ Группа</button>
+      <button *ngIf="level > 0" type="button" class="btn btn-outline-danger" (click)="removeSelf(group.parent)">×</button>
+    </div>
+  </div>
+
+  <div class="filter-group__conditions" formArrayName="conditions">
+    <ng-container *ngFor="let cond of conditions.controls; index as i">
+      <ng-container [formGroupName]="i">
+        <ng-container *ngIf="isGroup(cond); else conditionBlock">
+          <app-filter-group
+            [group]="cond"
+            [level]="level + 1"
+            [propertyDefinitions]="propertyDefinitions"
+            [operators]="operators">
+          </app-filter-group>
+        </ng-container>
+
+        <ng-template #conditionBlock>
+          <div class="filter-condition">
+            <select class="form-select form-select-sm w-50" formControlName="propertyDefId">
+              <option [ngValue]="null" disabled selected>Выберите свойство</option>
+              <option *ngFor="let def of propertyDefinitions" [ngValue]="def.id">
+                {{ def.name }} · {{ propertyDataTypeLabels[def.dataType] }}
+              </option>
+            </select>
+
+            <select class="form-select form-select-sm w-25" formControlName="op">
+              <option *ngFor="let o of operators" [value]="o.value">
+                {{ o.value }} — {{ o.label }}
+              </option>
+            </select>
+
+
+            <input class="form-control form-control-sm w-25" formControlName="value" placeholder="значение" />
+
+            <button type="button" class="btn btn-outline-danger btn-sm" (click)="remove(i)">×</button>
+          </div>
+        </ng-template>
+      </ng-container>
+    </ng-container>
+  </div>
+</div>

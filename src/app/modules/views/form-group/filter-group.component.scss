@@ -1,0 +1,69 @@
+$group-colors: (
+  0: #f8f9fa,
+  1: #f0f8ff,
+  2: #f6fff0,
+  3: #fff9f0,
+  4: #f9f0ff
+);
+
+.filter-group {
+  position: relative;
+  margin: 10px 0;
+  padding: 10px 12px 8px;
+  border-left: 2px solid #dee2e6;
+  border-radius: 8px;
+  background-color: map-get($group-colors, 0);
+  transition: background-color 0.2s;
+
+  &.level-1 { background-color: map-get($group-colors, 1); }
+  &.level-2 { background-color: map-get($group-colors, 2); }
+  &.level-3 { background-color: map-get($group-colors, 3); }
+  &.level-4 { background-color: map-get($group-colors, 4); }
+
+  // Вертикальная соединительная линия
+  &::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #d0d0d0;
+    z-index: 0;
+  }
+
+  &__header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 4px 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    margin-bottom: 6px;
+  }
+
+  &__conditions {
+    margin-left: 18px;
+    margin-top: 4px;
+  }
+
+  .filter-condition {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-left: 2px dashed #dcdcdc;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 6px;
+  }
+
+  select,
+  input {
+    min-height: 28px;
+  }
+}
