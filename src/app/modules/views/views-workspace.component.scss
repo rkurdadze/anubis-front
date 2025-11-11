@@ -14,8 +14,104 @@
   padding-top: 1.85rem;
 }
 
+.views-workspace__right-column > [class*='col-'] {
+  display: flex;
+}
+
+.views-workspace__right-column > [class*='col-'] > .section-stack,
+.views-workspace__right-column > [class*='col-'] > .card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-builder {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background-color: var(--bs-body-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.filter-builder__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-builder__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.filter-builder__empty {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.filter-builder__conditions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.filter-builder__condition {
+  border: 1px dashed var(--bs-border-color);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background-color: var(--bs-body-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+
+.filter-builder__condition-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.filter-builder__condition-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-builder__property-hint {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--bs-secondary-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.filter-builder__property-hint i {
+  color: var(--bs-primary);
+}
+
+.form-label-sm {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
 @media (max-width: 1199.98px) {
   .views-workspace__switch {
     padding-top: 0;
+  }
+
+  .filter-builder__actions {
+    justify-content: flex-start;
   }
 }

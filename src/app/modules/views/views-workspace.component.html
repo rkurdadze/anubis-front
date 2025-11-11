@@ -54,138 +54,241 @@
     </div>
 
     <div class="col-12 col-xl-8 mt-4 mt-xl-0">
-      <div class="section-stack">
-        <ng-container *ngIf="isViewFormOpen; else viewFormPlaceholder">
-          <div class="card border-0 anubis-shadow">
-            <div class="card-header bg-white d-flex justify-content-between align-items-start py-3">
-              <div>
-                <h2 class="h5 mb-0">{{ selectedView?.name ?? 'Новое представление' }}</h2>
-                <p class="text-muted small mb-0" *ngIf="!selectedView">Заполните форму, чтобы создать пользовательское представление</p>
-                <p class="text-muted small mb-0" *ngIf="selectedView">Редактирование выбранного представления</p>
+      <div class="row g-4 align-items-stretch views-workspace__right-column">
+        <div class="col-12 col-xxl-7">
+          <div class="section-stack h-100">
+            <ng-container *ngIf="isViewFormOpen; else viewFormPlaceholder">
+              <div class="card border-0 anubis-shadow h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-start py-3">
+                  <div>
+                    <h2 class="h5 mb-0">{{ selectedView?.name ?? 'Новое представление' }}</h2>
+                    <p class="text-muted small mb-0" *ngIf="!selectedView">Заполните форму, чтобы создать пользовательское представление</p>
+                    <p class="text-muted small mb-0" *ngIf="selectedView">Редактирование выбранного представления</p>
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closeViewForm()">
+                    <i class="fa-solid fa-xmark me-1"></i>Скрыть
+                  </button>
+                </div>
+                <div class="card-body">
+                  <form [formGroup]="viewForm" class="row g-3" (ngSubmit)="saveView()">
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label">Название</label>
+                      <input type="text" class="form-control" formControlName="name" [class.is-invalid]="viewForm.get('name')?.invalid && viewForm.get('name')?.touched" />
+                      <div class="invalid-feedback">Укажите название представления.</div>
+                    </div>
+                    <div class="col-12 col-lg-3">
+                      <label class="form-label">Сортировка</label>
+                      <input type="number" class="form-control" formControlName="sortOrder" />
+                    </div>
+                    <div class="col-12 col-lg-3 views-workspace__switch">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="isCommon" formControlName="isCommon" />
+                        <label class="form-check-label" for="isCommon">Общее</label>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Фильтр</label>
+                      <div class="filter-builder" [formGroup]="filterBuilderForm">
+                        <div class="filter-builder__header">
+                          <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="useFilter" formControlName="isEnabled" />
+                            <label class="form-check-label" for="useFilter">Использовать фильтр</label>
+                          </div>
+                          <div class="filter-builder__actions" *ngIf="filterBuilderForm.get('isEnabled')?.value">
+                            <div class="input-group input-group-sm">
+                              <span class="input-group-text">Объединять условия</span>
+                              <select class="form-select form-select-sm" formControlName="operator">
+                                <option value="AND">И</option>
+                                <option value="OR">ИЛИ</option>
+                              </select>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" (click)="addCondition()">
+                              <i class="fa-solid fa-plus me-1"></i>Добавить условие
+                            </button>
+                          </div>
+                        </div>
+                        <div class="filter-builder__empty" *ngIf="!filterBuilderForm.get('isEnabled')?.value">
+                          <p class="mb-0 text-muted small">Фильтр отключён. Включите переключатель, чтобы настроить условия.</p>
+                        </div>
+                        <div class="filter-builder__conditions" formArrayName="conditions" *ngIf="filterBuilderForm.get('isEnabled')?.value">
+                          <div
+                            class="filter-builder__condition"
+                            *ngFor="let condition of filterConditions.controls; index as i"
+                            [formGroupName]="i"
+                          >
+                            <div class="filter-builder__condition-header">
+                              <span class="filter-builder__condition-title">Условие {{ i + 1 }}</span>
+                              <button
+                                type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                (click)="removeCondition(i)"
+                                [disabled]="filterConditions.length === 1"
+                              >
+                                <i class="fa-solid fa-xmark"></i>
+                              </button>
+                            </div>
+                            <div class="row g-3 align-items-end">
+                              <div class="col-12 col-md-4">
+                                <label class="form-label form-label-sm">Свойство</label>
+                                <select
+                                  class="form-select form-select-sm"
+                                  formControlName="propertyDefId"
+                                  [class.is-invalid]="condition.get('propertyDefId')?.invalid && (condition.get('propertyDefId')?.dirty || condition.get('propertyDefId')?.touched)"
+                                >
+                                  <option [ngValue]="null">Выберите свойство</option>
+                                  <ng-container *ngFor="let def of propertyDefinitions$ | async">
+                                    <option [ngValue]="def.id">{{ def.name }} · #{{ def.id }}</option>
+                                  </ng-container>
+                                </select>
+                                <div class="invalid-feedback d-block" *ngIf="condition.get('propertyDefId')?.invalid && (condition.get('propertyDefId')?.dirty || condition.get('propertyDefId')?.touched)">
+                                  Укажите свойство.
+                                </div>
+                              </div>
+                              <div class="col-12 col-md-4 col-xl-3">
+                                <label class="form-label form-label-sm">Оператор</label>
+                                <select
+                                  class="form-select form-select-sm"
+                                  formControlName="op"
+                                  [class.is-invalid]="condition.get('op')?.invalid && (condition.get('op')?.dirty || condition.get('op')?.touched)"
+                                >
+                                  <option *ngFor="let option of filterOperatorOptions" [value]="option.value">{{ option.label }}</option>
+                                </select>
+                                <div class="invalid-feedback d-block" *ngIf="condition.get('op')?.invalid && (condition.get('op')?.dirty || condition.get('op')?.touched)">
+                                  Выберите оператор.
+                                </div>
+                              </div>
+                              <div class="col-12 col-md-4 col-xl-5" *ngIf="requiresValue(condition)">
+                                <label class="form-label form-label-sm">Значение</label>
+                                <input
+                                  class="form-control form-control-sm"
+                                  type="text"
+                                  formControlName="value"
+                                  [placeholder]="getValuePlaceholder(condition.get('propertyDefId')?.value ?? null)"
+                                  [class.is-invalid]="condition.get('value')?.invalid && (condition.get('value')?.dirty || condition.get('value')?.touched)"
+                                />
+                                <div class="invalid-feedback">Заполните значение.</div>
+                              </div>
+                              <div class="col-12 col-md-4 col-xl-5" *ngIf="requiresRange(condition)">
+                                <label class="form-label form-label-sm">Значение до</label>
+                                <input
+                                  class="form-control form-control-sm"
+                                  type="text"
+                                  formControlName="valueTo"
+                                  [placeholder]="getValuePlaceholder(condition.get('propertyDefId')?.value ?? null)"
+                                  [class.is-invalid]="condition.get('valueTo')?.invalid && (condition.get('valueTo')?.dirty || condition.get('valueTo')?.touched)"
+                                />
+                                <div class="invalid-feedback">Укажите конечное значение.</div>
+                              </div>
+                            </div>
+                            <div class="filter-builder__property-hint" *ngIf="condition.get('propertyDefId')?.value as propertyId">
+                              <i class="fa-solid fa-circle-info"></i>
+                              <span>{{ getPropertySummary(propertyId) }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Группировки (JSON массив)</label>
+                      <textarea class="form-control" rows="3" formControlName="groupingsJson" placeholder='[{"level":1,"propertyDefId":100}]'></textarea>
+                    </div>
+                    <div class="col-12 d-flex gap-2 flex-wrap">
+                      <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
+                        <i class="fa-solid" [ngClass]="selectedView ? 'fa-floppy-disk' : 'fa-plus'"></i>
+                        <span class="ms-2">{{ selectedView ? 'Сохранить изменения' : 'Создать представление' }}</span>
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary flex-fill" (click)="cancelViewChanges()">
+                        <i class="fa-solid fa-ban"></i>
+                        <span class="ms-2">{{ selectedView ? 'Отменить изменения' : 'Отменить создание' }}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closeViewForm()">
-                <i class="fa-solid fa-xmark me-1"></i>Скрыть
-              </button>
+            </ng-container>
+
+            <ng-template #viewFormPlaceholder>
+              <div class="card border-0 anubis-shadow placeholder-card h-100">
+                <div class="card-body text-center py-5">
+                  <i class="fa-solid fa-filter display-5 text-primary"></i>
+                  <p class="mt-3 mb-0 text-muted">Нажмите «Новое представление», чтобы открыть форму создания.</p>
+                </div>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+        <div class="col-12 col-xxl-5">
+          <div class="card border-0 anubis-shadow h-100">
+            <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center py-3">
+              <h2 class="h6 mb-0">Результаты выполнения</h2>
+              <div class="d-flex gap-2 flex-wrap justify-content-end">
+                <button class="btn btn-outline-primary btn-sm" type="button" (click)="selectedView && executeView(selectedView)" [disabled]="!selectedView || isExecuting">
+                  <i class="fa-solid fa-play me-1"></i>Запуск
+                </button>
+                <div class="input-group input-group-sm" [formGroup]="userForm">
+                  <span class="input-group-text">Пользователь ACL</span>
+                  <input type="number" class="form-control" formControlName="executeForUserId" />
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    (click)="selectedView && executeViewWithAcl(selectedView)"
+                    [disabled]="!selectedView"
+                  >
+                    <i class="fa-solid fa-user-shield me-1"></i>ACL
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="card-body">
-              <form [formGroup]="viewForm" class="row g-3" (ngSubmit)="saveView()">
-                <div class="col-12 col-lg-6">
-                  <label class="form-label">Название</label>
-                  <input type="text" class="form-control" formControlName="name" [class.is-invalid]="viewForm.get('name')?.invalid && viewForm.get('name')?.touched" />
-                  <div class="invalid-feedback">Укажите название представления.</div>
-                </div>
-                <div class="col-12 col-lg-3">
-                  <label class="form-label">Сортировка</label>
-                  <input type="number" class="form-control" formControlName="sortOrder" />
-                </div>
-                <div class="col-12 col-lg-3 views-workspace__switch">
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="isCommon" formControlName="isCommon" />
-                    <label class="form-check-label" for="isCommon">Общее</label>
+              <div class="row g-4">
+                <div class="col-12">
+                  <h3 class="h6">Объекты</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                      <thead class="table-light text-uppercase small text-muted">
+                        <tr>
+                          <th scope="col">Название</th>
+                          <th scope="col">Тип</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let item of executionResults$ | async">
+                          <td class="fw-semibold">{{ item.name }}</td>
+                          <td class="text-muted">#{{ item.typeId }}</td>
+                        </tr>
+                        <tr *ngIf="(executionResults$ | async)?.length === 0">
+                          <td colspan="2" class="text-center text-muted py-3">Ещё нет данных.</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Фильтр (JSON)</label>
-                  <textarea class="form-control" rows="3" formControlName="filterJson" placeholder='{"propertyDefId":1,"op":"EQ","value":"..."}'></textarea>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Группировки (JSON массив)</label>
-                  <textarea class="form-control" rows="3" formControlName="groupingsJson" placeholder='[{"level":1,"propertyDefId":100}]'></textarea>
-                </div>
-                <div class="col-12 d-flex gap-2 flex-wrap">
-                  <button type="submit" class="btn btn-primary flex-fill" [disabled]="isSaving">
-                    <i class="fa-solid" [ngClass]="selectedView ? 'fa-floppy-disk' : 'fa-plus'"></i>
-                    <span class="ms-2">{{ selectedView ? 'Сохранить изменения' : 'Создать представление' }}</span>
-                  </button>
-                  <button type="button" class="btn btn-outline-secondary flex-fill" (click)="cancelViewChanges()">
-                    <i class="fa-solid fa-ban"></i>
-                    <span class="ms-2">{{ selectedView ? 'Отменить изменения' : 'Отменить создание' }}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </ng-container>
-
-        <ng-template #viewFormPlaceholder>
-          <div class="card border-0 anubis-shadow placeholder-card">
-            <div class="card-body text-center py-5">
-              <i class="fa-solid fa-filter display-5 text-primary"></i>
-              <p class="mt-3 mb-0 text-muted">Нажмите «Новое представление», чтобы открыть форму создания.</p>
-            </div>
-          </div>
-        </ng-template>
-
-        <div class="card border-0 anubis-shadow">
-          <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center py-3">
-            <h2 class="h6 mb-0">Результаты выполнения</h2>
-            <div class="d-flex gap-2">
-              <button class="btn btn-outline-primary btn-sm" type="button" (click)="selectedView && executeView(selectedView)" [disabled]="!selectedView || isExecuting">
-                <i class="fa-solid fa-play me-1"></i>Запуск
-              </button>
-              <div class="input-group input-group-sm" [formGroup]="userForm">
-                <span class="input-group-text">Пользователь ACL</span>
-                <input type="number" class="form-control" formControlName="executeForUserId" />
-                <button
-                  class="btn btn-outline-secondary"
-                  type="button"
-                  (click)="selectedView && executeViewWithAcl(selectedView)"
-                  [disabled]="!selectedView"
-                >
-                  <i class="fa-solid fa-user-shield me-1"></i>ACL
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="row g-4">
-              <div class="col-12 col-lg-6">
-                <h3 class="h6">Объекты</h3>
-                <div class="table-responsive">
-                  <table class="table table-sm table-hover">
-                    <thead class="table-light text-uppercase small text-muted">
-                      <tr>
-                        <th scope="col">Название</th>
-                        <th scope="col">Тип</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let item of executionResults$ | async">
-                        <td class="fw-semibold">{{ item.name }}</td>
-                        <td class="text-muted">#{{ item.typeId }}</td>
-                      </tr>
-                      <tr *ngIf="(executionResults$ | async)?.length === 0">
-                        <td colspan="2" class="text-center text-muted py-3">Ещё нет данных.</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div class="col-12 col-lg-6">
-                <h3 class="h6">Версии c ACL</h3>
-                <div class="table-responsive">
-                  <table class="table table-sm table-hover">
-                    <thead class="table-light text-uppercase small text-muted">
-                      <tr>
-                        <th scope="col">Версия</th>
-                        <th scope="col">Изменено</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let item of aclResults$ | async">
-                        <td class="fw-semibold">#{{ item.id }}</td>
-                        <td>
-                          <span *ngIf="item.modifiedAt || item.createdAt; else noDate">
-                            {{ (item.modifiedAt || item.createdAt) | date: 'dd.MM.yyyy HH:mm' }}
-                          </span>
-                          <ng-template #noDate><span class="text-muted">нет данных</span></ng-template>
-                        </td>
-                      </tr>
-                      <tr *ngIf="(aclResults$ | async)?.length === 0">
-                        <td colspan="2" class="text-center text-muted py-3">Не выполнялось.</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <h3 class="h6">Версии c ACL</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                      <thead class="table-light text-uppercase small text-muted">
+                        <tr>
+                          <th scope="col">Версия</th>
+                          <th scope="col">Изменено</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let item of aclResults$ | async">
+                          <td class="fw-semibold">#{{ item.id }}</td>
+                          <td>
+                            <span *ngIf="item.modifiedAt || item.createdAt; else noDate">
+                              {{ (item.modifiedAt || item.createdAt) | date: 'dd.MM.yyyy HH:mm' }}
+                            </span>
+                            <ng-template #noDate><span class="text-muted">нет данных</span></ng-template>
+                          </td>
+                        </tr>
+                        <tr *ngIf="(aclResults$ | async)?.length === 0">
+                          <td colspan="2" class="text-center text-muted py-3">Не выполнялось.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

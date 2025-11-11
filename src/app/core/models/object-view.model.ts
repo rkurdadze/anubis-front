@@ -8,7 +8,7 @@ export interface ObjectView {
   name: string;
   isCommon?: boolean;
   createdById?: number;
-  filterJson?: string;
+  filterJson?: ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null;
   sortOrder?: number;
   groupings?: ViewGrouping[];
 }

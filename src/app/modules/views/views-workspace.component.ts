@@ -1,14 +1,24 @@
 import { AsyncPipe, DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BehaviorSubject, Subject, of } from 'rxjs';
-import { catchError, takeUntil } from 'rxjs/operators';
+import { catchError, map, takeUntil, tap } from 'rxjs/operators';
 
 import { ObjectViewApi } from '../../core/api/view.api';
-import { ObjectView } from '../../core/models/object-view.model';
+import { ObjectView, ObjectViewFilterCondition } from '../../core/models/object-view.model';
 import { RepositoryObject } from '../../core/models/object.model';
 import { ObjectVersion } from '../../core/models/object-version.model';
+import { PropertyDefinitionApi } from '../../core/api/property-def.api';
+import { PropertyDefinition } from '../../core/models/property-def.model';
+import { PropertyDataType } from '../../core/models/property-data-type.enum';
 import { ToastService, ToastType } from '../../shared/services/toast.service';
+
+interface FilterOperatorConfig {
+  value: string;
+  label: string;
+  requiresValue: boolean;
+  requiresRange?: boolean;
+}
 
 @Component({
   selector: 'app-views-workspace',
@@ -21,17 +31,21 @@ import { ToastService, ToastType } from '../../shared/services/toast.service';
 export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly objectViewApi = inject(ObjectViewApi);
+  private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
   private readonly toast = inject(ToastService);
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
   private readonly viewsSubject = new BehaviorSubject<ObjectView[]>([]);
   private readonly resultsSubject = new BehaviorSubject<RepositoryObject[]>([]);
   private readonly aclResultsSubject = new BehaviorSubject<ObjectVersion[]>([]);
+  private readonly propertyDefinitionsSubject = new BehaviorSubject<PropertyDefinition[]>([]);
   selectedView: ObjectView | null = null;
   isViewFormOpen = false;
 
   readonly views$ = this.viewsSubject.asObservable();
   readonly executionResults$ = this.resultsSubject.asObservable();
   readonly aclResults$ = this.aclResultsSubject.asObservable();
+  readonly propertyDefinitions$ = this.propertyDefinitionsSubject.asObservable();
 
   readonly userForm = this.fb.group({
     userId: [1, [Validators.required, Validators.min(1)]],
@@ -42,15 +56,64 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     name: ['', [Validators.required, Validators.maxLength(255)]],
     isCommon: [false],
     sortOrder: [0],
-    filterJson: [''],
+    filterJson: this.fb.control<any>(null),
     groupingsJson: ['']
   });
+
+  readonly filterBuilderForm = this.fb.group({
+    isEnabled: [false],
+    operator: ['AND'],
+    conditions: this.fb.array([])
+  });
+
+  private readonly filterOperators: FilterOperatorConfig[] = [
+    { value: 'EQ', label: 'Равно', requiresValue: true },
+    { value: 'NEQ', label: 'Не равно', requiresValue: true },
+    { value: 'GT', label: 'Больше', requiresValue: true },
+    { value: 'GTE', label: 'Больше или равно', requiresValue: true },
+    { value: 'LT', label: 'Меньше', requiresValue: true },
+    { value: 'LTE', label: 'Меньше или равно', requiresValue: true },
+    { value: 'CONTAINS', label: 'Содержит', requiresValue: true },
+    { value: 'STARTS_WITH', label: 'Начинается с', requiresValue: true },
+    { value: 'ENDS_WITH', label: 'Заканчивается на', requiresValue: true },
+    { value: 'BETWEEN', label: 'Между', requiresValue: true, requiresRange: true },
+    { value: 'IN', label: 'В списке', requiresValue: true },
+    { value: 'IS_NULL', label: 'Пустое значение', requiresValue: false },
+    { value: 'NOT_NULL', label: 'Не пустое значение', requiresValue: false }
+  ];
+
+  private readonly filterOperatorMap = new Map<string, FilterOperatorConfig>(
+    this.filterOperators.map(item => [item.value, item])
+  );
+
+  private readonly propertyDataTypeLabels: Record<PropertyDataType, string> = {
+    [PropertyDataType.TEXT]: 'Текст',
+    [PropertyDataType.INTEGER]: 'Целое число',
+    [PropertyDataType.FLOAT]: 'Число',
+    [PropertyDataType.BOOLEAN]: 'Логический',
+    [PropertyDataType.DATE]: 'Дата',
+    [PropertyDataType.VALUELIST]: 'Справочник',
+    [PropertyDataType.MULTI_VALUELIST]: 'Множественный справочник'
+  };
+
+  private propertyDefinitionMap = new Map<number, PropertyDefinition>();
 
   isSaving = false;
   isLoading = false;
   isExecuting = false;
 
   ngOnInit(): void {
+    this.resetFilterBuilder();
+    this.filterBuilderForm
+      .get('isEnabled')!
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe(enabled => {
+        if (enabled && this.filterConditions.length === 0) {
+          this.addCondition();
+        }
+      });
+
+    this.loadPropertyDefinitions();
     this.loadViews();
   }
 
@@ -93,6 +156,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
   createView(): void {
     this.selectedView = null;
     this.viewForm.reset({ name: '', isCommon: false, sortOrder: 0, filterJson: '', groupingsJson: '' });
+    this.resetFilterBuilder();
     this.isViewFormOpen = true;
   }
 
@@ -147,10 +211,14 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const filter = this.parseJson(this.viewForm.value.filterJson ?? '');
+    const filter = this.buildFilterPayload();
     if (filter === null) {
       return;
     }
+
+    // ✅ больше не сериализуем в строку!
+    this.viewForm.patchValue({ filterJson: filter });
+
     const groupings = this.parseJson(this.viewForm.value.groupingsJson ?? '', true);
     if (groupings === null) {
       return;
@@ -161,7 +229,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       name: this.viewForm.value.name!.trim(),
       isCommon: this.viewForm.value.isCommon ?? false,
       sortOrder: this.viewForm.value.sortOrder ?? undefined,
-      filterJson: filter ? JSON.stringify(filter) : undefined,
+      filterJson: filter ?? undefined,
       groupings: Array.isArray(groupings) ? groupings : undefined,
       createdById: this.selectedView?.createdById ?? this.userForm.get('userId')!.value ?? undefined
     };
@@ -182,9 +250,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$)
       )
       .subscribe(result => {
-        if (!result) {
-          return;
-        }
+        if (!result) return;
         this.showMessage('success', `Представление «${result.name}» сохранено.`);
         this.isSaving = false;
         this.loadViews();
@@ -267,6 +333,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       filterJson: view.filterJson ? view.filterJson : '',
       groupingsJson: view.groupings ? JSON.stringify(view.groupings, null, 2) : ''
     });
+    this.populateFilterBuilder(view.filterJson);
     this.isViewFormOpen = true;
   }
 
@@ -276,6 +343,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     this.resultsSubject.next([]);
     this.aclResultsSubject.next([]);
     this.isViewFormOpen = false;
+    this.resetFilterBuilder();
   }
 
   private parseJson(value: string, expectArray = false): any[] | Record<string, unknown> | undefined | null {
@@ -295,6 +363,364 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
       this.showMessage('error', 'Неверный JSON формат.');
       return null;
     }
+  }
+
+  private loadPropertyDefinitions(): void {
+    this.propertyDefinitionApi
+      .list(0, 500)
+      .pipe(
+        map(response => response.content ?? []),
+        catchError(() => {
+          this.showMessage('error', 'Не удалось загрузить список свойств.');
+          return of<PropertyDefinition[]>([]);
+        }),
+        tap(defs => {
+          this.propertyDefinitionsSubject.next(defs);
+          this.propertyDefinitionMap = new Map(defs.map(def => [def.id, def]));
+          this.cdr.markForCheck();
+        }),
+        takeUntil(this.destroy$)
+      )
+      .subscribe();
+  }
+
+  get filterConditions(): FormArray<FormGroup> {
+    return this.filterBuilderForm.get('conditions') as FormArray<FormGroup>;
+  }
+
+  get filterOperatorOptions(): FilterOperatorConfig[] {
+    return this.filterOperators;
+  }
+
+  addCondition(initial?: Partial<ObjectViewFilterCondition>): void {
+    this.filterConditions.push(this.createConditionGroup(initial));
+  }
+
+  removeCondition(index: number): void {
+    if (index < 0 || index >= this.filterConditions.length) {
+      return;
+    }
+    this.filterConditions.removeAt(index);
+  }
+
+  requiresValue(control: AbstractControl): boolean {
+    const group = control as FormGroup;
+    const op = group.get('op')?.value as string;
+    const config = this.filterOperatorMap.get(op);
+    if (!config) {
+      return true;
+    }
+    return config.requiresValue;
+  }
+
+  requiresRange(control: AbstractControl): boolean {
+    const group = control as FormGroup;
+    const op = group.get('op')?.value as string;
+    const config = this.filterOperatorMap.get(op);
+    return !!config?.requiresRange;
+  }
+
+  getOperatorLabel(value: string): string {
+    return this.filterOperatorMap.get(value)?.label ?? value;
+  }
+
+  getPropertySummary(propertyDefId: number | null): string {
+    if (!propertyDefId) {
+      return '';
+    }
+    const def = this.propertyDefinitionMap.get(propertyDefId);
+    if (!def) {
+      return `ID ${propertyDefId}`;
+    }
+    const typeLabel = this.propertyDataTypeLabels[def.dataType] ?? def.dataType;
+    return `${def.name} · ${typeLabel} · #${def.id}`;
+  }
+
+  getValuePlaceholder(propertyDefId: number | null): string {
+    if (!propertyDefId) {
+      return 'Введите значение';
+    }
+    const def = this.propertyDefinitionMap.get(propertyDefId);
+    if (!def) {
+      return 'Введите значение';
+    }
+    switch (def.dataType) {
+      case PropertyDataType.DATE:
+        return 'Например: 2024-05-15';
+      case PropertyDataType.INTEGER:
+      case PropertyDataType.FLOAT:
+        return 'Введите число';
+      case PropertyDataType.BOOLEAN:
+        return 'true / false';
+      case PropertyDataType.VALUELIST:
+      case PropertyDataType.MULTI_VALUELIST:
+        return 'ID значения или список через запятую';
+      default:
+        return 'Введите значение';
+    }
+  }
+
+  private resetFilterBuilder(): void {
+    this.filterBuilderForm.patchValue({ isEnabled: false, operator: 'AND' });
+    this.filterConditions.clear();
+  }
+
+  private populateFilterBuilder(filterJson: ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null | undefined): void {
+    if (!filterJson) {
+      this.resetFilterBuilder();
+      return;
+    }
+
+    const normalized = this.normalizeFilterStructure(filterJson);
+    if (!normalized) {
+      this.resetFilterBuilder();
+      return;
+    }
+
+    this.filterBuilderForm.patchValue({ isEnabled: true, operator: normalized.operator });
+    this.filterConditions.clear();
+    normalized.conditions.forEach(c => this.addCondition(c));
+
+    if (this.filterConditions.length === 0) {
+      this.addCondition();
+    }
+  }
+
+
+  private normalizeFilterJson(json: string): { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null {
+    const trimmed = json.trim();
+    if (!trimmed) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      return this.normalizeFilterStructure(parsed);
+    } catch (err) {
+      this.showMessage('error', 'Не удалось прочитать фильтр представления.');
+      return null;
+    }
+  }
+
+  private normalizeFilterStructure(raw: any): { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null {
+    if (Array.isArray(raw)) {
+      const conditions = (raw as unknown[])
+        .map((item: unknown) => this.sanitizeCondition(item))
+        .filter((item: ObjectViewFilterCondition | null): item is ObjectViewFilterCondition => item !== null);
+      if (!conditions.length) {
+        return null;
+      }
+      return { operator: 'AND', conditions };
+    }
+
+    if (this.isConditionShape(raw)) {
+      const condition = this.sanitizeCondition(raw);
+      if (!condition) {
+        return null;
+      }
+      return { operator: 'AND', conditions: [condition] };
+    }
+
+    if (raw && typeof raw === 'object') {
+      const conditionsRaw = Array.isArray((raw as { conditions?: unknown[] }).conditions)
+        ? ((raw as { conditions: unknown[] }).conditions as unknown[])
+        : [];
+      const conditions = conditionsRaw
+        .map((item: unknown) => this.sanitizeCondition(item))
+        .filter((item: ObjectViewFilterCondition | null): item is ObjectViewFilterCondition => item !== null);
+
+      if (!conditions.length) {
+        return null;
+      }
+      const operator = typeof raw.operator === 'string' && raw.operator.toUpperCase() === 'OR' ? 'OR' : 'AND';
+      return { operator, conditions };
+    }
+
+    return null;
+  }
+
+  private sanitizeCondition(raw: unknown): ObjectViewFilterCondition | null {
+    if (!this.isConditionShape(raw)) {
+      return null;
+    }
+    const propertyDefId = Number(raw.propertyDefId);
+    if (!Number.isFinite(propertyDefId)) {
+      return null;
+    }
+    const condition: ObjectViewFilterCondition = {
+      propertyDefId,
+      op: String(raw.op)
+    };
+
+    if (raw.value !== undefined) {
+      condition.value = this.stringifyConditionValue(raw.value);
+    }
+    if (raw.valueTo !== undefined) {
+      condition.valueTo = this.stringifyConditionValue(raw.valueTo);
+    }
+    return condition;
+  }
+
+  private isConditionShape(raw: unknown): raw is {
+    propertyDefId: number | string;
+    op: string;
+    value?: unknown;
+    valueTo?: unknown;
+  } {
+    return !!raw && typeof raw === 'object' && 'propertyDefId' in raw && 'op' in raw;
+  }
+
+  private createConditionGroup(initial?: Partial<ObjectViewFilterCondition>): FormGroup {
+    return this.fb.group({
+      propertyDefId: [initial?.propertyDefId ?? null, Validators.required],
+      op: [initial?.op ?? 'EQ', Validators.required],
+      value: [this.stringifyConditionValue(initial?.value)],
+      valueTo: [this.stringifyConditionValue(initial?.valueTo)]
+    });
+  }
+
+  private stringifyConditionValue(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    if (Array.isArray(value) || typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch (err) {
+        return String(value);
+      }
+    }
+    return String(value);
+  }
+
+  private buildFilterPayload(): ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | undefined | null {
+    if (!this.filterBuilderForm.get('isEnabled')!.value) {
+      return undefined;
+    }
+
+    if (this.filterConditions.length === 0) {
+      this.showMessage('error', 'Добавьте хотя бы одно условие фильтра или отключите фильтр.');
+      return null;
+    }
+
+    const conditions: ObjectViewFilterCondition[] = [];
+    let hasErrors = false;
+
+    this.filterConditions.controls.forEach(control => {
+      const condition = this.prepareCondition(control);
+      if (!condition) {
+        hasErrors = true;
+      } else {
+        conditions.push(condition);
+      }
+    });
+
+    if (hasErrors) {
+      this.showMessage('error', 'Заполните обязательные поля в фильтре.');
+      return null;
+    }
+
+    if (!conditions.length) {
+      return undefined;
+    }
+
+    const operatorControl = this.filterBuilderForm.get('operator');
+    const operatorValue = typeof operatorControl?.value === 'string' ? operatorControl.value.toUpperCase() : 'AND';
+    const operator: 'AND' | 'OR' = operatorValue === 'OR' ? 'OR' : 'AND';
+
+    if (conditions.length === 1) {
+      return conditions[0];
+    }
+
+    return {
+      operator,
+      conditions
+    };
+  }
+
+  private prepareCondition(control: AbstractControl): ObjectViewFilterCondition | null {
+    const group = control as FormGroup;
+    const propertyControl = group.get('propertyDefId');
+    const opControl = group.get('op');
+    const valueControl = group.get('value');
+    const valueToControl = group.get('valueTo');
+
+    propertyControl?.markAsTouched();
+    opControl?.markAsTouched();
+    valueControl?.markAsTouched();
+    valueToControl?.markAsTouched();
+
+    const propertyDefId = Number(propertyControl?.value ?? NaN);
+    const op = typeof opControl?.value === 'string' ? opControl.value : '';
+    const config = this.filterOperatorMap.get(op);
+
+    if (!Number.isFinite(propertyDefId)) {
+      propertyControl?.setErrors({ required: true });
+      return null;
+    }
+
+    if (!op) {
+      opControl?.setErrors({ required: true });
+      return null;
+    }
+
+    const rawValue = valueControl?.value ?? '';
+    const rawValueTo = valueToControl?.value ?? '';
+
+    if (config?.requiresValue && this.isEmptyValue(rawValue)) {
+      valueControl?.setErrors({ required: true });
+      return null;
+    }
+
+    if (config?.requiresRange) {
+      const hasStart = !this.isEmptyValue(rawValue);
+      const hasEnd = !this.isEmptyValue(rawValueTo);
+      if (!hasStart || !hasEnd) {
+        if (!hasStart) {
+          valueControl?.setErrors({ required: true });
+        }
+        if (!hasEnd) {
+          valueToControl?.setErrors({ required: true });
+        }
+        return null;
+      }
+    }
+
+    const condition: ObjectViewFilterCondition = {
+      propertyDefId,
+      op
+    };
+
+    if (config?.requiresRange) {
+      condition.value = this.normalizeValue(rawValue);
+      condition.valueTo = this.normalizeValue(rawValueTo);
+      return condition;
+    }
+
+    if (config?.requiresValue) {
+      condition.value = this.normalizeValue(rawValue);
+    }
+
+    return condition;
+  }
+
+  private normalizeValue(value: unknown): string {
+    if (typeof value === 'string') {
+      return value.trim();
+    }
+    if (value === null || value === undefined) {
+      return '';
+    }
+    return String(value);
+  }
+
+  private isEmptyValue(value: unknown): boolean {
+    if (value === null || value === undefined) {
+      return true;
+    }
+    if (typeof value === 'string') {
+      return value.trim().length === 0;
+    }
+    return false;
   }
 
   private showMessage(type: ToastType, text: string): void {
