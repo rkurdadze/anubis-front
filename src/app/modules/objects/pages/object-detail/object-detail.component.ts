@@ -840,8 +840,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     switch (def.dataType) {
       case PropertyDataType.BOOLEAN:
         return String(value === true || value === 'true');
-      case PropertyDataType.INTEGER:
-      case PropertyDataType.FLOAT:
+      case PropertyDataType.NUMBER:
         return String(value);
       case PropertyDataType.MULTI_VALUELIST:
         return Array.isArray(value) ? value.join(',') : String(value);
@@ -869,10 +868,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     switch (def.dataType) {
       case PropertyDataType.BOOLEAN:
         return trimmed === 'true' || trimmed === '1' || trimmed === 'on';
-      case PropertyDataType.INTEGER:
-        return trimmed ? Number.parseInt(trimmed, 10) : null;
-      case PropertyDataType.FLOAT:
-        return trimmed ? Number.parseFloat(trimmed) : null;
+      case PropertyDataType.NUMBER:
+        return trimmed ? Number(trimmed) : null;
       case PropertyDataType.MULTI_VALUELIST:
         return typeof trimmed === 'string'
           ? trimmed.split(',').map(item => item.trim()).filter(Boolean)

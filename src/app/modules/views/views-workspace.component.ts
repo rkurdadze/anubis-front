@@ -89,8 +89,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
 
   private readonly propertyDataTypeLabels: Record<PropertyDataType, string> = {
     [PropertyDataType.TEXT]: 'Текст',
-    [PropertyDataType.INTEGER]: 'Целое число',
-    [PropertyDataType.FLOAT]: 'Число',
+    [PropertyDataType.NUMBER]: 'Число',
     [PropertyDataType.BOOLEAN]: 'Логический',
     [PropertyDataType.DATE]: 'Дата',
     [PropertyDataType.VALUELIST]: 'Справочник',
@@ -449,8 +448,7 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     switch (def.dataType) {
       case PropertyDataType.DATE:
         return 'Например: 2024-05-15';
-      case PropertyDataType.INTEGER:
-      case PropertyDataType.FLOAT:
+      case PropertyDataType.NUMBER:
         return 'Введите число';
       case PropertyDataType.BOOLEAN:
         return 'true / false';

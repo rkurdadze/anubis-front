@@ -1,7 +1,6 @@
 export enum PropertyDataType {
   TEXT = 'TEXT',
-  INTEGER = 'INTEGER',
-  FLOAT = 'FLOAT',
+  NUMBER = 'NUMBER',
   BOOLEAN = 'BOOLEAN',
   DATE = 'DATE',
   VALUELIST = 'VALUELIST',

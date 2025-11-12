@@ -29,7 +29,7 @@ export class ObjectViewApi {
   }
 
   execute(id: number): Observable<RepositoryObject[]> {
-    return this.http.get<RepositoryObject[]>(`${this.baseUrl}/${id}/execute`);
+    return this.http.get<RepositoryObject[]>(`${this.baseUrl}/${id}/execute/1`);
   }
 
   executeWithAcl(id: number, userId: number): Observable<ObjectVersion[]> {

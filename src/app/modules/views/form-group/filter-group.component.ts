@@ -21,8 +21,7 @@ export class FilterGroupComponent {
 
   readonly propertyDataTypeLabels: Record<PropertyDataType, string> = {
     TEXT: 'Текст',
-    INTEGER: 'Целое число',
-    FLOAT: 'Число',
+    NUMBER: 'Число',
     BOOLEAN: 'Логический',
     DATE: 'Дата',
     VALUELIST: 'Справочник',
