@@ -4,13 +4,12 @@ import { map } from 'rxjs/operators';
 
 import { ApiHttpService } from '../services/api-http.service';
 import {
-  Acl,
-  AclEntry,
   SaveAclEntryPayload,
   SaveAclPayload,
   SecurityPrincipal,
   UserStatus
 } from '../models/user-management.model';
+import {Acl, AclEntry} from '../models/acl.model';
 
 interface RoleSummaryDto {
   id: number;

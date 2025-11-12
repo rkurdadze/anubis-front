@@ -92,9 +92,13 @@ export class ObjectTypeApi {
   }
 
   private mapPayload(payload: SaveObjectTypePayload): unknown {
+    const { name, nameI18n, vaultId, aclId } = payload;
+
     return {
-      name: payload.name,
-      vaultId: payload.vaultId
+      name: name?.trim() ?? '',
+      nameI18n: nameI18n?.trim() || '{}',
+      vaultId: vaultId ?? null,
+      aclId: aclId ?? null
     };
   }
 }

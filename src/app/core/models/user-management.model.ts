@@ -23,25 +23,6 @@ export interface SecurityPrincipal {
   effectiveRoles: RoleSummary[];
 }
 
-export interface AclEntry {
-  id: number;
-  aclId: number;
-  granteeType: GranteeType;
-  granteeId: number;
-  canRead: boolean;
-  canWrite: boolean;
-  canDelete: boolean;
-  canChangeAcl: boolean;
-  principal: SecurityPrincipal | null;
-}
-
-export interface Acl {
-  id: number;
-  name: string;
-  description: string | null;
-  entries: AclEntry[];
-}
-
 export interface SaveAclPayload {
   name: string;
   description?: string | null;

@@ -38,42 +38,42 @@
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead class="table-light text-muted text-uppercase small">
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">Название</th>
-                <th scope="col">Хранилище</th>
-                <th scope="col" class="text-end">Действия</th>
-              </tr>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Название</th>
+              <th scope="col">Хранилище</th>
+              <th scope="col" class="text-end">Действия</th>
+            </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let type of filteredTypes$ | async; trackBy: trackById">
-                <td class="text-muted">#{{ type.id }}</td>
-                <td class="fw-semibold">{{ type.name }}</td>
-                <td>
-                  <div class="fw-semibold">{{ type.vault?.name ?? '—' }}</div>
-                  <div class="text-muted small" *ngIf="type.vault?.code">Код: {{ type.vault?.code }}</div>
-                </td>
-                <td class="text-end">
-                  <div class="action-buttons">
-                    <button type="button" class="btn btn-outline-primary btn-icon" (click)="startEdit(type)">
-                      <i class="fa-solid fa-pen"></i>
-                      <span class="visually-hidden">Редактировать</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-outline-danger btn-icon"
-                      [disabled]="deletingId === type.id"
-                      (click)="delete(type)"
-                    >
-                      <i class="fa-solid fa-trash"></i>
-                      <span class="visually-hidden">Удалить</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr *ngIf="(filteredTypes$ | async)?.length === 0">
-                <td colspan="4" class="text-center text-muted py-4">Типы объектов не найдены.</td>
-              </tr>
+            <tr *ngFor="let type of filteredTypes$ | async; trackBy: trackById">
+              <td class="text-muted">#{{ type.id }}</td>
+              <td class="fw-semibold">{{ type.name }}</td>
+              <td>
+                <div class="fw-semibold">{{ type.vault?.name ?? '—' }}</div>
+                <div class="text-muted small" *ngIf="type.vault?.code">Код: {{ type.vault?.code }}</div>
+              </td>
+              <td class="text-end">
+                <div class="action-buttons">
+                  <button type="button" class="btn btn-outline-primary btn-icon" (click)="startEdit(type)">
+                    <i class="fa-solid fa-pen"></i>
+                    <span class="visually-hidden">Редактировать</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-icon"
+                    [disabled]="deletingId === type.id"
+                    (click)="delete(type)"
+                  >
+                    <i class="fa-solid fa-trash"></i>
+                    <span class="visually-hidden">Удалить</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="(filteredTypes$ | async)?.length === 0">
+              <td colspan="4" class="text-center text-muted py-4">Типы объектов не найдены.</td>
+            </tr>
             </tbody>
           </table>
         </div>
@@ -86,7 +86,8 @@
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <div>
               <h2 class="h5 mb-0">{{ editingType ? 'Редактирование типа' : 'Новый тип объекта' }}</h2>
-              <p class="text-muted small mb-0" *ngIf="!editingType">Заполните форму для создания нового типа объектов</p>
+              <p class="text-muted small mb-0" *ngIf="!editingType">Заполните форму для создания нового типа
+                объектов</p>
               <p class="text-muted small mb-0" *ngIf="editingType">Измените параметры выбранного типа</p>
             </div>
             <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelEdit()">
@@ -97,7 +98,8 @@
             <form [formGroup]="typeForm" class="d-flex flex-column gap-3" (ngSubmit)="submit()">
               <div>
                 <label class="form-label">Название</label>
-                <input type="text" class="form-control" formControlName="name" [class.is-invalid]="typeForm.get('name')?.invalid && typeForm.get('name')?.touched" />
+                <input type="text" class="form-control" formControlName="name"
+                       [class.is-invalid]="typeForm.get('name')?.invalid && typeForm.get('name')?.touched"/>
                 <div class="invalid-feedback">Введите название типа.</div>
               </div>
               <ng-container *ngIf="vaults$ | async as vaults">
@@ -110,11 +112,42 @@
                     [class.is-invalid]="typeForm.get('vaultId')?.invalid && typeForm.get('vaultId')?.touched"
                   >
                     <option [ngValue]="null" disabled>Выберите хранилище</option>
-                    <option *ngFor="let vault of vaults" [ngValue]="vault.id">{{ vault.name }} ({{ vault.code }})</option>
+                    <option *ngFor="let vault of vaults" [ngValue]="vault.id">{{ vault.name }} ({{ vault.code }})
+                    </option>
                   </select>
                   <div class="invalid-feedback">Выберите хранилище.</div>
                   <div class="form-text text-muted" *ngIf="vaults.length === 0">
                     Создайте хотя бы одно хранилище, чтобы назначить его типу объектов.
+                  </div>
+                </div>
+              </ng-container>
+              <div>
+                <label class="form-label" for="objectTypeNameI18n">Локализованные названия (JSON)</label>
+                <textarea
+                  id="objectTypeNameI18n"
+                  class="form-control"
+                  rows="2"
+                  formControlName="nameI18n"
+                  placeholder='Например: {"en":"Document","ru":"Документ"}'
+                ></textarea>
+                <div class="form-text text-muted">Используйте JSON для указания переводов по языкам.</div>
+              </div>
+
+              <ng-container *ngIf="acls$ | async as acls">
+                <div>
+                  <label class="form-label" for="objectTypeAcl">Access Control List (ACL)</label>
+                  <select
+                    id="objectTypeAcl"
+                    class="form-select"
+                    formControlName="aclId"
+                    [class.is-invalid]="typeForm.get('aclId')?.invalid && typeForm.get('aclId')?.touched"
+                  >
+                    <option [ngValue]="null" disabled>Выберите ACL</option>
+                    <option *ngFor="let acl of acls" [ngValue]="acl.id">{{ acl.name }}</option>
+                  </select>
+                  <div class="invalid-feedback">Выберите ACL.</div>
+                  <div class="form-text text-muted" *ngIf="acls.length === 0">
+                    Создайте хотя бы один ACL, чтобы назначить его типу объектов.
                   </div>
                 </div>
               </ng-container>

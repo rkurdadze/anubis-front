@@ -10,8 +10,6 @@ import { UsersApi } from '../../core/api/users.api';
 import { GroupsApi } from '../../core/api/groups.api';
 import { RolesApi } from '../../core/api/roles.api';
 import {
-  Acl,
-  AclEntry,
   GranteeType,
   Group,
   Role,
@@ -20,6 +18,7 @@ import {
   SecurityPrincipal,
   User
 } from '../../core/models/user-management.model';
+import {Acl, AclEntry} from '../../core/models/acl.model';
 
 interface FiltersFormValue {
   search: string;
@@ -39,7 +38,7 @@ interface AclMetrics {
 @Component({
   selector: 'app-acls',
   standalone: true,
-  imports: [ReactiveFormsModule, NgFor, NgIf, AsyncPipe, NgClass],
+  imports: [ReactiveFormsModule, NgFor, NgIf, AsyncPipe],
   templateUrl: './acls.component.html',
   styleUrls: ['./acls.component.scss'],
   host: { class: 'security-page' },
