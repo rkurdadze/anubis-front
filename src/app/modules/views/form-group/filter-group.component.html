@@ -1,5 +1,11 @@
-<div class="filter-group" [class.child-group]="level > 0" [formGroup]="group">
-  <!-- Заголовок группы -->
+<div
+  class="filter-group"
+  [class.child-group]="level > 0"
+  [attr.data-operator]="group.get('operator')?.value"
+  [formGroup]="group"
+>
+
+<!-- Заголовок группы -->
   <div class="filter-group__header">
     <div class="filter-group__header-left">
       <i class="fa-solid fa-code-branch me-1"></i>

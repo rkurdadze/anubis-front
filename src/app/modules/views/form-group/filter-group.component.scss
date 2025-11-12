@@ -4,28 +4,35 @@
   padding: 0.75rem 0.75rem 0.6rem 0.9rem;
   border-radius: 0.7rem;
   border-left: 3px solid var(--group-color, #d0d7de);
-  background-color: #fff;
+  background-color: var(--group-bg, #fff);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
-  &.child-group {
-    margin-left: 1rem;
-    background-color: #f8faff;
+  // 🟦 Группа AND
+  &[data-operator='AND'] {
     --group-color: #0d6efd;
+    --group-bg: #f8faff;
   }
 
-  &:not(.child-group) {
-    --group-color: #6c757d;
+  // 🟨 Группа OR
+  &[data-operator='OR'] {
+    --group-color: #ffc107;
+    --group-bg: #fff9e6;
+  }
+
+  // 🔹 Вложенные группы чуть темнее по контуру
+  &.child-group {
+    border-left-width: 4px;
   }
 
   .filter-group__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(13, 110, 253, 0.05);
+    background: rgba(0, 0, 0, 0.03);
     border-radius: 0.4rem;
     padding: 0.4rem 0.6rem;
     margin-bottom: 0.5rem;
-    border: 1px solid rgba(13, 110, 253, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.08);
 
     .filter-group__header-left {
       display: flex;
@@ -35,9 +42,15 @@
       font-size: 0.85rem;
       color: var(--group-color);
 
+      i {
+        color: var(--group-color);
+      }
+
       select {
         width: auto;
-        min-width: 60px;
+        min-width: 65px;
+        font-weight: 600;
+        text-transform: uppercase;
       }
     }
 
