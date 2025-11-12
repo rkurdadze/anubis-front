@@ -1,69 +1,99 @@
-$group-colors: (
-  0: #f8f9fa,
-  1: #f0f8ff,
-  2: #f6fff0,
-  3: #fff9f0,
-  4: #f9f0ff
-);
-
 .filter-group {
   position: relative;
-  margin: 10px 0;
-  padding: 10px 12px 8px;
-  border-left: 2px solid #dee2e6;
-  border-radius: 8px;
-  background-color: map-get($group-colors, 0);
-  transition: background-color 0.2s;
+  margin: 0.6rem 0;
+  padding: 0.75rem 0.75rem 0.6rem 0.9rem;
+  border-radius: 0.7rem;
+  border-left: 3px solid var(--group-color, #d0d7de);
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
-  &.level-1 { background-color: map-get($group-colors, 1); }
-  &.level-2 { background-color: map-get($group-colors, 2); }
-  &.level-3 { background-color: map-get($group-colors, 3); }
-  &.level-4 { background-color: map-get($group-colors, 4); }
-
-  // Вертикальная соединительная линия
-  &::before {
-    content: '';
-    position: absolute;
-    left: 6px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: #d0d0d0;
-    z-index: 0;
+  &.child-group {
+    margin-left: 1rem;
+    background-color: #f8faff;
+    --group-color: #0d6efd;
   }
 
-  &__header {
-    position: relative;
-    z-index: 1;
+  &:not(.child-group) {
+    --group-color: #6c757d;
+  }
+
+  .filter-group__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 4px 8px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    margin-bottom: 6px;
+    background: rgba(13, 110, 253, 0.05);
+    border-radius: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid rgba(13, 110, 253, 0.15);
+
+    .filter-group__header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--group-color);
+
+      select {
+        width: auto;
+        min-width: 60px;
+      }
+    }
+
+    .filter-group__header-actions {
+      display: flex;
+      gap: 0.3rem;
+
+      button {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+      }
+    }
   }
 
-  &__conditions {
-    margin-left: 18px;
-    margin-top: 4px;
+  .filter-group__conditions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    border-left: 1px dashed rgba(0, 0, 0, 0.1);
+    padding-left: 0.8rem;
   }
 
   .filter-condition {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    border-left: 2px dashed #dcdcdc;
-    margin: 4px 0;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 6px;
-  }
+    gap: 0.4rem;
+    background: #ffffff;
+    border: 1px solid #e1e6eb;
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    transition: background-color 0.2s ease;
 
-  select,
-  input {
-    min-height: 28px;
+    &:hover {
+      background: #f7f9fc;
+    }
+
+    .filter-condition__number {
+      font-weight: 600;
+      color: var(--group-color);
+      font-size: 0.8rem;
+    }
+
+    select,
+    input {
+      font-size: 0.82rem;
+      flex: 1 1 30%;
+    }
+
+    input {
+      min-width: 100px;
+    }
+
+    button {
+      flex: 0 0 auto;
+      padding: 0.2rem 0.4rem;
+      line-height: 1;
+    }
   }
 }

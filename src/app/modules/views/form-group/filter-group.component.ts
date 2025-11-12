@@ -70,4 +70,38 @@ export class FilterGroupComponent {
     }
   }
 
+  /**
+   * Рекурсивно создаёт FormGroup из JSON-структуры фильтра
+   */
+  buildGroup(data?: any): FormGroup {
+    return this.fb.group({
+      operator: [data?.operator ?? 'AND'],
+      conditions: this.fb.array(
+        (data?.conditions ?? []).map((cond: any) =>
+          this.isGroupJson(cond)
+            ? this.buildGroup(cond)
+            : this.buildCondition(cond)
+        )
+      )
+    });
+  }
+
+  /**
+   * Создаёт FormGroup для одного условия (leaf)
+   */
+  buildCondition(data?: any): FormGroup {
+    return this.fb.group({
+      propertyDefId: [data?.propertyDefId ?? null],
+      op: [data?.op ?? 'EQ'],
+      value: [data?.value ?? ''],
+      valueTo: [data?.valueTo ?? '']
+    });
+  }
+
+  /**
+   * Определяет, является ли элемент группой (а не условием)
+   */
+  isGroupJson(cond: any): boolean {
+    return cond && typeof cond === 'object' && Array.isArray(cond.conditions);
+  }
 }

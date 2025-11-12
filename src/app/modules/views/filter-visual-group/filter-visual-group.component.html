@@ -1,0 +1,74 @@
+<div
+  class="filter-visual__group"
+  [class.and-group]="group.operator === 'AND'"
+  [class.or-group]="group.operator === 'OR'"
+  [ngStyle]="indentStyle"
+>
+  <!-- Заголовок — всегда видим -->
+  <div
+    class="filter-visual__header"
+    (click)="toggleCollapsed()"
+    [class.collapsed]="collapsed"
+  >
+    <i
+      class="fa-solid toggle-icon me-1"
+      [ngClass]="{
+        'fa-chevron-down': !collapsed,
+        'fa-chevron-right': collapsed
+      }"
+    ></i>
+    <i
+      class="fa-solid me-1"
+      [ngClass]="{
+        'fa-code-branch': isGroup(group),
+        'fa-right-long': !isGroup(group)
+      }"
+    ></i>
+    <span class="fw-semibold">
+      {{ group.operator === 'OR' ? 'ИЛИ' : 'И' }}
+    </span>
+    <span class="text-muted small ms-1">
+      ({{ conditionCount }} {{ conditionCount === 1 ? 'условие' : 'условий' }})
+    </span>
+  </div>
+
+  <!-- Только тело скрывается -->
+  <div
+    class="filter-visual__body"
+    [@expandCollapseBody]="expandState"
+  >
+    <ng-container *ngFor="let item of conditions; index as i">
+      <ng-container *ngIf="isGroup(item); else conditionBlock">
+        <app-filter-visual-group
+          [group]="item"
+          [level]="level + 1"
+          [getPropertySummary]="getPropertySummary"
+          [getOperatorLabel]="getOperatorLabel"
+        ></app-filter-visual-group>
+      </ng-container>
+
+      <ng-template #conditionBlock>
+        <div class="filter-visual__condition">
+          <div class="filter-visual__headerline">
+            <span class="filter-visual__number">#{{ i + 1 }}</span>
+            <span
+              class="filter-visual__property"
+              [title]="getPropertySummary(item.propertyDefId ?? null)"
+            >
+              {{ getPropertySummary(item.propertyDefId ?? null) }}
+            </span>
+          </div>
+          <div class="filter-visual__infoline">
+            <span class="filter-visual__operator">
+              {{ getOperatorLabel(item.op ?? '') }}
+            </span>
+            <span class="filter-visual__values">
+              {{ item.value }}
+              <span *ngIf="item.valueTo">→ {{ item.valueTo }}</span>
+            </span>
+          </div>
+        </div>
+      </ng-template>
+    </ng-container>
+  </div>
+</div>

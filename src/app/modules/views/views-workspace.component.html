@@ -178,43 +178,17 @@
                     <!-- 🟦 Визуализация фильтра -->
                     <div class="col-12" *ngIf="selectedView?.filterJson as filter">
                       <h3 class="h6 mb-3">Фильтр представления</h3>
-                      <div class="filter-visual">
-                        <div class="filter-visual__header">
-                          <i class="fa-solid fa-code-branch text-primary"></i>
-                          <span class="fw-semibold">Объединять условия: </span>
-                          <span class="badge bg-light text-dark border ms-2">
-        {{ getFilterOperatorLabelSafe(filter) }}
-      </span>
-                        </div>
-
-                        <div class="filter-visual__conditions">
-                          <div
-                            class="filter-visual__condition"
-                            *ngFor="let cond of getFilterConditions(filter); index as i"
-                          >
-                            <div class="filter-visual__number">#{{ i + 1 }}</div>
-                            <div class="filter-visual__body">
-                              <div class="filter-visual__row">
-                                <span class="filter-visual__label">Свойство:</span>
-                                <span class="filter-visual__value">{{ getPropertySummary(cond.propertyDefId) }}</span>
-                              </div>
-                              <div class="filter-visual__row">
-                                <span class="filter-visual__label">Оператор:</span>
-                                <span class="filter-visual__value">{{ getOperatorLabel(cond.op) }}</span>
-                              </div>
-                              <div class="filter-visual__row" *ngIf="cond.value !== undefined">
-                                <span class="filter-visual__label">Значение:</span>
-                                <span class="filter-visual__value">{{ cond.value }}</span>
-                              </div>
-                              <div class="filter-visual__row" *ngIf="cond.valueTo !== undefined">
-                                <span class="filter-visual__label">Значение до:</span>
-                                <span class="filter-visual__value">{{ cond.valueTo }}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                      <div class="filter-visual p-3 border rounded-3 bg-white">
+                        <app-filter-visual-group
+                          [group]="filter"
+                          [getPropertySummary]="getPropertySummary.bind(this)"
+                          [getOperatorLabel]="getOperatorLabel.bind(this)">
+                        </app-filter-visual-group>
                       </div>
                     </div>
+
+
+
 
 
                     <table class="table table-sm table-hover">

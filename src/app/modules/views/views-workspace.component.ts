@@ -13,6 +13,7 @@ import { PropertyDefinition } from '../../core/models/property-def.model';
 import { PropertyDataType } from '../../core/models/property-data-type.enum';
 import { ToastService, ToastType } from '../../shared/services/toast.service';
 import {FilterGroupComponent} from './form-group/filter-group.component';
+import {FilterVisualGroupComponent} from './filter-visual-group/filter-visual-group.component';
 
 export interface FilterOperatorConfig {
   value: string;
@@ -24,7 +25,7 @@ export interface FilterOperatorConfig {
 @Component({
   selector: 'app-views-workspace',
   standalone: true,
-  imports: [AsyncPipe, NgIf, NgFor, NgClass, ReactiveFormsModule, DatePipe, FilterGroupComponent],
+  imports: [AsyncPipe, NgIf, NgFor, NgClass, ReactiveFormsModule, DatePipe, FilterGroupComponent, FilterVisualGroupComponent],
   templateUrl: './views-workspace.component.html',
   styleUrls: ['./views-workspace.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -472,32 +473,20 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
 
 
   private populateFilterBuilder(
-    filterJson: ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] } | null | undefined
+    filterJson: any
   ): void {
     if (!filterJson) {
       this.resetFilterBuilder();
       return;
     }
 
-    const normalized = this.normalizeFilterStructure(filterJson);
-    if (!normalized) {
-      this.resetFilterBuilder();
-      return;
-    }
+    const root = this.createFilterGroup(filterJson);
 
-    const root = this.filterBuilderForm.get('rootGroup') as FormGroup;
-    const conditions = root.get('conditions') as FormArray;
-
+    // Полностью заменяем старую структуру
+    this.filterBuilderForm.setControl('rootGroup', root);
     this.filterBuilderForm.patchValue({ isEnabled: true });
-    root.patchValue({ operator: normalized.operator });
-    conditions.clear();
-
-    normalized.conditions.forEach(c => conditions.push(this.createConditionGroup(c)));
-
-    if (conditions.length === 0) {
-      conditions.push(this.createConditionGroup());
-    }
   }
+
 
 
 
@@ -755,15 +744,22 @@ export class ViewsWorkspaceComponent implements OnInit, OnDestroy {
     return op === 'OR' ? 'ИЛИ' : 'И';
   }
 
-  getFilterConditions(
-    filter: ObjectViewFilterCondition | { operator: 'AND' | 'OR'; conditions: ObjectViewFilterCondition[] }
+
+  getFilterConditionsRecursive(
+    filter: ObjectViewFilterCondition | { operator?: 'AND' | 'OR'; conditions?: ObjectViewFilterCondition[] }
   ): ObjectViewFilterCondition[] {
     if (!filter) return [];
-    if ('conditions' in filter) {
-      return filter.conditions;
+
+    // Если это группа (имеет conditions)
+    if ('conditions' in filter && Array.isArray(filter.conditions)) {
+      return filter.conditions.flatMap(c => this.getFilterConditionsRecursive(c));
     }
+
+    // Если это простое условие
     return [filter];
   }
+
+
 
   getFilterOperatorLabelSafe(filter: any): string {
     if (filter && typeof filter === 'object' && 'operator' in filter) {
