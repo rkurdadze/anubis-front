@@ -43,7 +43,7 @@ export class ObjectTypesListComponent implements OnDestroy {
     name: ['', [Validators.required, Validators.maxLength(255)]],
     nameI18n: [''],
     vaultId: [null as number | null, Validators.required],
-    aclId: [null as number | null, Validators.required]
+    aclId: [null as number | null]
   });
 
   readonly vaults$ = this.reloadVaults$.pipe(

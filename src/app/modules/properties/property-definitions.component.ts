@@ -284,7 +284,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
           next: updated => {
             this.showMessage('success', `Свойство «${updated.name}» обновлено.`);
             this.refresh();
-            this.startCreate();
+            this.closePropertyForm();
             this.isSaving = false;
           },
           error: () => {
@@ -302,7 +302,7 @@ export class PropertyDefinitionsComponent implements OnInit, OnDestroy {
         next: created => {
           this.showMessage('success', `Свойство «${created.name}» создано.`);
           this.refresh();
-          this.startEdit(created);
+          this.closePropertyForm();
           this.isSaving = false;
         },
         error: () => {

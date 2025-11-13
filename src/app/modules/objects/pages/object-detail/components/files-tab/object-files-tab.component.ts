@@ -5,7 +5,7 @@ import {
   NgFor,
   NgIf
 } from '@angular/common';
-import { HttpEventType } from '@angular/common/http';
+import {HttpEventType} from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -17,17 +17,22 @@ import {
   Output,
   ViewEncapsulation
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { BehaviorSubject, Observable, Subject, combineLatest, from, of } from 'rxjs';
-import { catchError, concatMap, finalize, last, map, switchMap, take, takeUntil, tap } from 'rxjs/operators';
+import {FormsModule} from '@angular/forms';
+import {BehaviorSubject, Observable, Subject, combineLatest, from, of} from 'rxjs';
+import {catchError, concatMap, finalize, last, map, switchMap, take, takeUntil, tap} from 'rxjs/operators';
 
-import { FileApi } from '../../../../../../core/api/file.api';
-import { ObjectFile, RepositoryObject } from '../../../../../../core/models/object.model';
-import { ToastService, ToastType } from '../../../../../../shared/services/toast.service';
+import {FileApi} from '../../../../../../core/api/file.api';
+import {ObjectFile, RepositoryObject} from '../../../../../../core/models/object.model';
+import {ToastService, ToastType} from '../../../../../../shared/services/toast.service';
 import {
   FilePreviewComponent
 } from './components/file-preview/file-preview.component';
-import { determinePreviewKind, getFileIconClass, formatFileSize, ZipBuilder } from './components/file-preview/file-preview.helpers';
+import {
+  determinePreviewKind,
+  getFileIconClass,
+  formatFileSize,
+  ZipBuilder
+} from './components/file-preview/file-preview.helpers';
 
 interface UploadProgressState {
   totalFiles: number;
@@ -40,7 +45,7 @@ interface UploadProgressState {
 @Component({
   selector: 'app-object-files-tab',
   standalone: true,
-  imports: [AsyncPipe, DatePipe, FormsModule, NgClass, NgFor, NgIf, FilePreviewComponent],
+  imports: [AsyncPipe, FormsModule, NgClass, NgFor, NgIf, FilePreviewComponent],
   templateUrl: './object-files-tab.component.html',
   styleUrls: ['./object-files-tab.component.scss'],
   encapsulation: ViewEncapsulation.None,
@@ -66,7 +71,8 @@ export class ObjectFilesTabComponent implements OnDestroy {
     private readonly fileApi: FileApi,
     private readonly cdr: ChangeDetectorRef,
     private readonly toast: ToastService
-  ) {}
+  ) {
+  }
 
 
   readonly files$: Observable<ObjectFile[]> = combineLatest([this.object$, this.reload$]).pipe(
@@ -74,12 +80,15 @@ export class ObjectFilesTabComponent implements OnDestroy {
       if (!object) {
         return of<ObjectFile[]>([]);
       }
-      return this.fileApi.listByObject(object.id).pipe(
-        catchError(() => {
-          this.showToast('error', 'Не удалось загрузить список файлов.');
-          return of<ObjectFile[]>([]);
-        })
-      );
+      return this.versionId
+        ? this.fileApi.listByVersion(this.versionId)
+        : this.fileApi.listByObject(object.id)
+          .pipe(
+            catchError(() => {
+              this.showToast('error', 'Не удалось загрузить список файлов.');
+              return of<ObjectFile[]>([]);
+            })
+          );
     }),
     tap(files => {
       this.currentFiles = [...files];
@@ -106,6 +115,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
   selectedFiles = new Set<number>();
   isExporting = false;
   currentFiles: ObjectFile[] = [];
+  @Input() versionId!: number | null;
 
   refreshFiles(): void {
     this.reload$.next();
@@ -144,7 +154,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
           this.reload$.next();
           this.fileChange.emit(); // 🔹 <— добавь вот это
           if (this.previewFile?.id === targetFile.id) {
-            this.selectFile({ ...targetFile, filename: updated.filename, size: updated.size }, true);
+            this.selectFile({...targetFile, filename: updated.filename, size: updated.size}, true);
           }
         },
         error: () => this.showToast('error', 'Не удалось заменить файл.')
@@ -214,7 +224,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
         next: blob => {
           let result = blob;
           if (!useDownload && blob.type.toLowerCase() !== 'application/pdf') {
-            result = new Blob([blob], { type: 'application/pdf' });
+            result = new Blob([blob], {type: 'application/pdf'});
           }
           this.previewBlob = result;
           this.cdr.markForCheck();
@@ -244,7 +254,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
       .subscribe({
         next: updated => {
           this.showToast('success', 'Изменения сохранены.');
-          this.previewFile = { ...this.previewFile!, filename: updated.filename, size: updated.size };
+          this.previewFile = {...this.previewFile!, filename: updated.filename, size: updated.size};
           this.reload$.next();
           this.fileChange.emit();
           this.selectFile(this.previewFile, true);
@@ -345,9 +355,9 @@ export class ObjectFilesTabComponent implements OnDestroy {
       .pipe(take(1))
       .subscribe({
         next: blob => {
-          const file = new File([blob], this.previewFile!.filename, { type: blob.type || this.previewFile!.mimeType });
+          const file = new File([blob], this.previewFile!.filename, {type: blob.type || this.previewFile!.mimeType});
           if (navigator.clipboard && 'write' in navigator.clipboard) {
-            const item = new ClipboardItem({ [file.type || 'application/octet-stream']: file });
+            const item = new ClipboardItem({[file.type || 'application/octet-stream']: file});
             from(navigator.clipboard.write([item]))
               .pipe(take(1))
               .subscribe({
@@ -384,7 +394,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
         concatMap(file =>
           this.fileApi.download(file.id).pipe(
             switchMap(blob => from(blob.arrayBuffer())),
-            map(buffer => ({ file, data: new Uint8Array(buffer) })),
+            map(buffer => ({file, data: new Uint8Array(buffer)})),
             catchError(() => {
               this.showToast('error', `Не удалось экспортировать файл «${file.filename}».`);
               return of(null);
@@ -411,7 +421,7 @@ export class ObjectFilesTabComponent implements OnDestroy {
             return;
           }
           const zipBytes = builder.build();
-          const blob = new Blob([zipBytes], { type: 'application/zip' });
+          const blob = new Blob([zipBytes], {type: 'application/zip'});
           const url = window.URL.createObjectURL(blob);
           const anchor = document.createElement('a');
           const objectId = object?.id;
@@ -476,8 +486,14 @@ export class ObjectFilesTabComponent implements OnDestroy {
       .subscribe({
         next: result => {
           if (result) {
-            this.reload$.next();
-            this.fileChange.emit();
+            // 🔄 force async refresh after upload
+            setTimeout(() => {
+              this.versionId = null; // ⬅ СБРОС! переходим на текущую версию
+              this.reload$.next();
+              this.fileChange.emit();
+              this.cdr.markForCheck();
+            });
+            return;
           }
         },
         error: () => this.showToast('error', 'Во время загрузки произошла ошибка.')

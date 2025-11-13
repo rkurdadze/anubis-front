@@ -377,6 +377,7 @@
         <section *ngSwitchCase="'files'">
           <app-object-files-tab
             [object]="object"
+            [versionId]="selectedVersionModel"
             [canUpload]="canUploadFiles()"
             (fileChange)="onFileChange()"
           ></app-object-files-tab>

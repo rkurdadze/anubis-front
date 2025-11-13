@@ -234,9 +234,8 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
         )
     ),
     tap(versions => {
-      const current = this.selectedVersionSubject.value;
-      if (!current || !versions.some(v => v.id === current)) {
-        this.selectVersion(versions[0]?.id ?? null, false);
+      if (this.selectedVersionModel == null && versions.length > 0) {
+        this.selectVersion(versions[0].id, false);
       }
     }),
     shareReplay(1)
@@ -469,6 +468,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(id => {
         this.selectedVersionModel = id;
+        this.cdRef.markForCheck(); // иногда Angular не обновляет select без этого
       });
 
   }
@@ -483,6 +483,9 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   onFileChange(): void {
     console.log('📂 [onFileChange] refreshing versions only');
     this.versionsReload$.next();
+    this.versions$.pipe(take(1)).subscribe(versions => {
+      this.selectVersion(versions[0].id, false);
+    });
   }
 
 
@@ -677,6 +680,16 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
           // Если новая версия НЕ создаётся в этом кейсе — можно вернуть propertiesReload$.next()
           // (но обычно для свойств логично версионировать).
           this.reload$.next();
+          // 🔄 After saving properties, a new version is created → reload versions and activate latest
+          this.versionsReload$.next();
+          this.versions$
+            .pipe(take(1))
+            .subscribe(versions => {
+              const latest = versions[0];
+              if (latest) {
+                this.selectVersion(latest.id, false);
+              }
+            });
         },
         error: () => {
           this.showMessage('error', 'Не удалось сохранить свойства.');
