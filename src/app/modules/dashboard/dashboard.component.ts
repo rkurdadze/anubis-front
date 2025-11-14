@@ -17,6 +17,7 @@ import { Vault } from '../../core/models/vault.model';
 import { ObjectType } from '../../core/models/object-type.model';
 import { ObjectClass } from '../../core/models/class.model';
 import { Page } from '../../core/models/page.model';
+import {DashboardApi} from '../../core/api/dashboard.api';
 
 interface DashboardMetrics {
   vaults: number;
@@ -72,7 +73,8 @@ export class DashboardComponent implements OnInit {
     private readonly objectApi: ObjectApi,
     private readonly valueListApi: ValueListApi,
     private readonly classApi: ClassApi,
-    private readonly searchApi: SearchApi
+    private readonly searchApi: SearchApi,
+    private readonly dashboardApi: DashboardApi,
   ) {}
 
   ngOnInit(): void {
@@ -91,8 +93,13 @@ export class DashboardComponent implements OnInit {
 
     this.metrics$ = this.buildMetrics$(vaults$, objectTypes$, objectsPage$);
     this.recentObjects$ = this.buildRecentObjects$(objectsPage$, classes$, objectTypes$);
-    this.objectDistribution$ = this.buildDistribution$(objectsPage$, objectTypes$);
-    this.activityStats$ = this.buildActivityStats$(objectsPage$);
+    this.objectDistribution$ = this.dashboardApi
+      .distribution()
+      .pipe(shareReplay({ bufferSize: 1, refCount: true }));
+
+    this.activityStats$ = this.dashboardApi
+      .activity(7)
+      .pipe(shareReplay({ bufferSize: 1, refCount: true }));
     this.searchResults$ = this.buildSearchResults$();
   }
 
@@ -183,66 +190,6 @@ export class DashboardComponent implements OnInit {
     );
   }
 
-
-  private buildDistribution$(
-    objectsPage$: Observable<Page<RepositoryObject>>,
-    objectTypes$: Observable<ObjectType[]>
-  ): Observable<ObjectDistributionItem[]> {
-    return combineLatest([objectsPage$, objectTypes$]).pipe(
-      map(([page, types]) => {
-        const list = page.content;
-        if (!list.length) return [];
-        const total = list.length;
-        const counts = list.reduce((acc, cur) => {
-          acc.set(cur.typeId, (acc.get(cur.typeId) ?? 0) + 1);
-          return acc;
-        }, new Map<number, number>());
-
-        return Array.from(counts.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([typeId, count]) => ({
-            typeId,
-            typeName: types.find(t => t.id === typeId)?.name ?? `Тип #${typeId}`,
-            count,
-            percentage: total ? (count / total) * 100 : 0
-          }));
-      })
-    );
-  }
-
-  private buildActivityStats$(
-    objectsPage$: Observable<Page<RepositoryObject>>
-  ): Observable<ActivityStatistic> {
-    return objectsPage$.pipe(
-      map(page => {
-        const list = page.content;
-        if (!list.length) return { days: [], total: 0, max: 0 };
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const fmt = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' });
-
-        const days = Array.from({ length: 7 }).map((_, i) => {
-          const day = new Date(today);
-          day.setDate(today.getDate() - (6 - i));
-          const start = new Date(day);
-          const end = new Date(day);
-          end.setHours(23, 59, 59, 999);
-          const count = list.filter(
-            x => x.createdAt && new Date(x.createdAt) >= start && new Date(x.createdAt) <= end
-          ).length;
-          return { label: fmt.format(day), count };
-        });
-
-        return {
-          days,
-          total: days.reduce((a, d) => a + d.count, 0),
-          max: Math.max(...days.map(d => d.count))
-        };
-      })
-    );
-  }
 
   private buildSearchResults$(): Observable<number[]> {
     return this.searchForm.valueChanges.pipe(
