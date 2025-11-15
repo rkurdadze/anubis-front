@@ -1,7 +1,7 @@
 import { AsyncPipe, DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import {BehaviorSubject, Subject, combineLatest, of, Observable} from 'rxjs';
 import {catchError, map, shareReplay, startWith, switchMap, takeUntil, tap} from 'rxjs/operators';
 
@@ -13,6 +13,8 @@ import { ObjectClass } from '../../../../core/models/class.model';
 import { ObjectType } from '../../../../core/models/object-type.model';
 import { ToastService, ToastType } from '../../../../shared/services/toast.service';
 import {Page} from '../../../../core/models/page.model';
+import { AclsApi } from '../../../../core/api/acls.api';
+import { Acl } from '../../../../core/models/acl.model';
 
 interface ObjectsListItem extends RepositoryObject {
   typeName?: string;
@@ -28,13 +30,22 @@ interface ObjectsListItem extends RepositoryObject {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ObjectsListComponent implements OnInit, OnDestroy {
+  private readonly noClassValue = '__NONE__';
+  private readonly classPlaceholderValue = '__SELECT__';
+
+  readonly noClassOptionValue = this.noClassValue;
+  readonly classPlaceholderOption = this.classPlaceholderValue;
+
   private readonly fb = inject(FormBuilder);
   private readonly objectApi = inject(ObjectApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly classApi = inject(ClassApi);
+  private readonly aclApi = inject(AclsApi);
   private readonly toast = inject(ToastService);
   private readonly destroy$ = new Subject<void>();
   private readonly reload$ = new BehaviorSubject<number>(0);
+
+  private availableAcls: Acl[] = [];
 
   readonly filterForm = this.fb.group({
     search: [''],
@@ -46,8 +57,14 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   readonly createForm = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
     typeId: [null as number | null, Validators.required],
-    classId: [null as number | null]
+    classId: [this.classPlaceholderValue as number | string | null, Validators.required],
+    aclId: [null as number | null]
   });
+
+  constructor() {
+    this.createForm.get('classId')!.addValidators(this.disallowClassPlaceholder());
+    this.createForm.get('classId')!.updateValueAndValidity({ emitEvent: false });
+  }
 
   readonly objectTypes$ = this.objectTypeApi.list().pipe(
     catchError(() => {
@@ -63,6 +80,24 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     catchError(() => {
       this.showMessage('error', 'Не удалось загрузить список классов.');
       return of<ObjectClass[]>([]);
+    }),
+    shareReplay(1)
+  );
+
+  readonly acls$ = this.aclApi.list().pipe(
+    map(acls => [...acls].sort((a, b) => a.name.localeCompare(b.name, 'ru'))),
+    tap(acls => {
+      this.availableAcls = acls;
+      const control = this.createForm.get('aclId');
+      if (control && (control.value === null || control.value === undefined) && acls.length > 0) {
+        control.setValue(acls[0].id);
+      }
+    }),
+    catchError(() => {
+      this.availableAcls = [];
+      this.createForm.get('aclId')?.setValue(null);
+      this.showMessage('error', 'Не удалось загрузить список ACL.');
+      return of<Acl[]>([]);
     }),
     shareReplay(1)
   );
@@ -160,7 +195,7 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$)
       )
       .subscribe(() => {
-        this.createForm.get('classId')!.setValue(null);
+        this.createForm.get('classId')!.setValue(this.classPlaceholderValue);
       });
 
     // 🔹 Загружаем первую страницу объектов при открытии
@@ -175,7 +210,14 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
   toggleCreatePanel(): void {
     this.isCreatePanelOpen = !this.isCreatePanelOpen;
     if (!this.isCreatePanelOpen) {
-      this.createForm.reset({ name: '', typeId: null, classId: null });
+      this.createForm.reset({ name: '', typeId: null, classId: this.classPlaceholderValue, aclId: null });
+    } else {
+      this.createForm.reset({
+        name: '',
+        typeId: null,
+        classId: this.classPlaceholderValue,
+        aclId: this.getDefaultAclId()
+      });
     }
   }
 
@@ -190,10 +232,12 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     }
 
     const payload = this.createForm.getRawValue();
+    const normalizedClassId = this.normalizeClassControlValue(payload.classId);
     const request: RepositoryObjectRequest = {
       name: payload.name!.trim(),
       typeId: payload.typeId!,
-      classId: payload.classId ?? null
+      classId: normalizedClassId,
+      aclId: payload.aclId ?? null
     };
 
     this.isPerformingAction = true;
@@ -218,7 +262,8 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     const request: RepositoryObjectRequest = {
       name: `${object.name} (копия)`.replace(/\s+\(копия\)$/u, '') + ' (копия)',
       typeId: object.typeId,
-      classId: object.classId ?? null
+      classId: object.classId ?? null,
+      aclId: object.aclId ?? null
     };
 
     this.isPerformingAction = true;
@@ -290,7 +335,35 @@ export class ObjectsListComponent implements OnInit, OnDestroy {
     return item.id;
   }
 
+  private normalizeClassControlValue(value: number | string | null | undefined): number | null {
+    if (value === this.classPlaceholderValue || value === null || value === undefined) {
+      return null;
+    }
+    if (value === this.noClassValue) {
+      return null;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return value;
+  }
+
+  private getDefaultAclId(): number | null {
+    return this.availableAcls.length > 0 ? this.availableAcls[0].id : null;
+  }
+
   private showMessage(type: ToastType, text: string): void {
     this.toast.show(type, text);
+  }
+
+  private disallowClassPlaceholder(): ValidatorFn {
+    return control => {
+      const value = control.value;
+      if (value === this.classPlaceholderValue) {
+        return { required: true };
+      }
+      return null;
+    };
   }
 }

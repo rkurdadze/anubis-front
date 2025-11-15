@@ -30,7 +30,7 @@
         <div class="card-body">
           <ng-container *ngIf="(isLatestVersionSelected$ | async); else versionSnapshotInfo">
             <form [formGroup]="objectForm" (ngSubmit)="saveObject(object)" class="row g-3">
-              <div class="col-md-6">
+              <div class="col-12 col-lg-5">
                 <label for="object-name" class="form-label">Название</label>
                 <input
                   id="object-name"
@@ -47,7 +47,7 @@
                   превышать 255 символов.
                 </div>
               </div>
-              <div class="col-md-3">
+              <div class="col-12 col-sm-6 col-lg-3">
                 <label for="object-type" class="form-label">Тип</label>
                 <select
                   id="object-type"
@@ -62,12 +62,31 @@
                   тип объекта.
                 </div>
               </div>
-              <div class="col-md-3">
+              <div class="col-12 col-sm-6 col-lg-2">
                 <label for="object-class" class="form-label">Класс</label>
-                <select id="object-class" class="form-select" formControlName="classId">
-                  <option [ngValue]="null">Без класса</option>
+                <select
+                  id="object-class"
+                  class="form-select"
+                  formControlName="classId"
+                  [ngClass]="{'is-invalid': objectForm.get('classId')?.invalid && (objectForm.get('classId')?.dirty || objectForm.get('classId')?.touched)}"
+                >
+                  <option [ngValue]="classPlaceholderOption" disabled>Выберите класс</option>
+                  <option [ngValue]="noClassOptionValue">Без класса</option>
                   <option *ngFor="let cls of (availableClasses$ | async)" [ngValue]="cls.id">{{ cls.name }}</option>
                 </select>
+                <div class="invalid-feedback">Выберите класс или укажите «Без класса».</div>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-2">
+                <label for="object-acl" class="form-label">Access Control List (ACL)</label>
+                <ng-container *ngIf="acls$ | async as acls">
+                  <select id="object-acl" class="form-select" formControlName="aclId">
+                    <option [ngValue]="null">Без ACL</option>
+                    <option *ngFor="let acl of acls" [ngValue]="acl.id">{{ acl.name }}</option>
+                  </select>
+                  <div class="form-text text-muted" *ngIf="acls.length === 0">
+                    Создайте хотя бы один ACL, чтобы назначить его объекту.
+                  </div>
+                </ng-container>
               </div>
               <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <small class="text-muted">
@@ -208,16 +227,17 @@
                       <div class="row g-3 align-items-end">
                         <div class="col-md-4">
                           <label class="form-label">Свойство</label>
-                          <select class="form-select" formControlName="propertyDefId">
-                            <option [ngValue]="null" disabled>Выберите свойство</option>
-                            <option
-                              *ngFor="let def of (propertyDefinitions$ | async); trackBy: trackById"
-                              [ngValue]="def.id"
-                              [disabled]="isPropertyDisabled(def.id, i)">
-                              {{ def.name }}
-                            </option>
-                          </select>
-
+                          <ng-container *ngIf="availablePropertyDefinitions$ | async as availableDefs">
+                            <select class="form-select" formControlName="propertyDefId">
+                              <option [ngValue]="null" disabled>Выберите свойство</option>
+                              <option
+                                *ngFor="let def of includeSelectedDefinition(availableDefs, group.get('propertyDefId')?.value); trackBy: trackById"
+                                [ngValue]="def.id"
+                                [disabled]="isPropertyDisabled(def.id, i)">
+                                {{ def.name }}
+                              </option>
+                            </select>
+                          </ng-container>
                         </div>
                         <div class="col-md-7">
                           <label class="form-label">Значение</label>

@@ -3,7 +3,14 @@ import { Observable } from 'rxjs';
 import { Page } from '../models/page.model';
 
 import { ApiHttpService } from '../services/api-http.service';
-import { ObjectClass, ObjectClassRequest, ClassPropertyBinding, ClassPropertyRequest } from '../models/class.model';
+import {
+  ObjectClass,
+  ObjectClassRequest,
+  ClassPropertyBinding,
+  ClassPropertyRequest,
+  ClassTreeNode,
+  EffectiveClassProperty
+} from '../models/class.model';
 
 @Injectable({ providedIn: 'root' })
 export class ClassApi {
@@ -14,6 +21,11 @@ export class ClassApi {
 
   list(page = 0, size = 20, sort = 'id,asc'): Observable<Page<ObjectClass>> {
     return this.http.get<Page<ObjectClass>>(this.baseUrl, { page, size, sort });
+  }
+
+  tree(objectTypeId?: number | null): Observable<ClassTreeNode[]> {
+    const params: Record<string, number> | undefined = objectTypeId ? { objectTypeId } : undefined;
+    return this.http.get<ClassTreeNode[]>(`${this.baseUrl}/tree`, params);
   }
 
   create(payload: ObjectClassRequest): Observable<ObjectClass> {
@@ -36,12 +48,16 @@ export class ClassApi {
     return this.http.get<ClassPropertyBinding[]>(`${this.bindingsUrl}/by-class/${classId}`);
   }
 
+  listEffectiveBindings(classId: number): Observable<EffectiveClassProperty[]> {
+    return this.http.get<EffectiveClassProperty[]>(`${this.bindingsUrl}/by-class/${classId}/effective`);
+  }
+
   createBinding(payload: ClassPropertyRequest): Observable<ClassPropertyBinding> {
     return this.http.post<ClassPropertyBinding>(this.bindingsUrl, payload);
   }
 
-  updateBinding(id: number, payload: ClassPropertyRequest): Observable<ClassPropertyBinding> {
-    return this.http.put<ClassPropertyBinding>(`${this.bindingsUrl}/${id}`, payload);
+  updateBinding(classId: number, propertyDefId: number, payload: ClassPropertyRequest): Observable<ClassPropertyBinding> {
+    return this.http.put<ClassPropertyBinding>(`${this.bindingsUrl}/${classId}/${propertyDefId}`, payload);
   }
 
   deleteBinding(classId: number, id: number): Observable<void> {
@@ -55,5 +71,4 @@ export class ClassApi {
   activateBinding(classId: number, id: number): Observable<void> {
     return this.http.patch<void>(`${this.bindingsUrl}/${classId}/${id}/activate`);
   }
-
 }

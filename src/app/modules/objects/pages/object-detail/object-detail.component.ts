@@ -14,6 +14,7 @@ import {
   FormGroup,
   FormsModule,
   ReactiveFormsModule,
+  ValidatorFn,
   Validators
 } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -43,14 +44,15 @@ import {
 import { ObjectApi } from '../../../../core/api/object.api';
 import { ObjectTypeApi } from '../../../../core/api/object-type.api';
 import { ClassApi } from '../../../../core/api/class.api';
+import { AclsApi } from '../../../../core/api/acls.api';
 import { ObjectVersionApi } from '../../../../core/api/object-version.api';
 import { ObjectPropertyValueApi } from '../../../../core/api/object-property-value.api';
 import { PropertyDefinitionApi } from '../../../../core/api/property-def.api';
 import { ObjectLinkApi } from '../../../../core/api/object-link.api';
 import { LinkRoleApi } from '../../../../core/api/link-role.api';
-import { RepositoryObject } from '../../../../core/models/object.model';
+import { RepositoryObject, RepositoryObjectRequest } from '../../../../core/models/object.model';
 import { ObjectType } from '../../../../core/models/object-type.model';
-import { ObjectClass } from '../../../../core/models/class.model';
+import { EffectiveClassProperty, ObjectClass } from '../../../../core/models/class.model';
 import { ObjectVersion, ObjectVersionDetail } from '../../../../core/models/object-version.model';
 import { PropertyValue } from '../../../../core/models/property-value.model';
 import { PropertyDefinition } from '../../../../core/models/property-def.model';
@@ -61,8 +63,9 @@ import { ObjectVersionAudit } from '../../../../core/models/object-version-audit
 import { PropertyDataType } from '../../../../core/models/property-data-type.enum';
 import { ToastService, ToastType } from '../../../../shared/services/toast.service';
 import { ObjectFilesTabComponent } from './components/files-tab/object-files-tab.component';
-import {ValueListApi} from '../../../../core/api/value-list.api';
-import {ValueListItem} from '../../../../core/models/value-list.model';
+import { ValueListApi } from '../../../../core/api/value-list.api';
+import { ValueListItem } from '../../../../core/models/value-list.model';
+import { Acl } from '../../../../core/models/acl.model';
 
 interface VersionWithAudit {
   version: ObjectVersion | null;
@@ -102,11 +105,18 @@ type PropertyFormGroup = FormGroup<{
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ObjectDetailComponent implements OnInit, OnDestroy {
+  private readonly noClassValue = '__NONE__';
+  private readonly classPlaceholderValue = '__SELECT__';
+
+  readonly noClassOptionValue = this.noClassValue;
+  readonly classPlaceholderOption = this.classPlaceholderValue;
+
   private readonly route = inject(ActivatedRoute);
   private readonly fb = inject(FormBuilder);
   private readonly objectApi = inject(ObjectApi);
   private readonly objectTypeApi = inject(ObjectTypeApi);
   private readonly classApi = inject(ClassApi);
+  private readonly aclApi = inject(AclsApi);
   private readonly objectVersionApi = inject(ObjectVersionApi);
   private readonly propertyValueApi = inject(ObjectPropertyValueApi);
   private readonly propertyDefinitionApi = inject(PropertyDefinitionApi);
@@ -135,6 +145,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private readonly linksReload$ = new BehaviorSubject<void>(undefined);
   private readonly auditReload$ = new BehaviorSubject<void>(undefined);
   private readonly selectedVersionSubject = new BehaviorSubject<number | null>(null);
+  private readonly classSelection$ = new BehaviorSubject<number | null>(null);
 
   expandedVersionId: number | null = null;
   highlightedVersionId: number | null = null;
@@ -166,6 +177,9 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   private propertyDefinitionMap = new Map<number, PropertyDefinition>();
   private classesCache: ObjectClass[] = [];
   private typesCache: ObjectType[] = [];
+  private availableAcls: Acl[] = [];
+  private allowedPropertyDefinitions: PropertyDefinition[] = [];
+  private isFormInitializing = false;
 
   readonly linkDirections = Object.values(LinkDirection);
 
@@ -175,12 +189,13 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   isLinkActionInProgress = false;
 
   hasChanges = false;
-  private originalObjectData: any;
+  private originalObjectData: any = {};
 
   protected objectForm = this.fb.group({
     name: this.fb.nonNullable.control('', { validators: [Validators.required, Validators.maxLength(255)] }),
     typeId: this.fb.control<number | null>(null, { validators: [Validators.required] }),
-    classId: this.fb.control<number | null>(null)
+    classId: this.fb.control<number | string | null>(this.classPlaceholderValue, { validators: [Validators.required] }),
+    aclId: this.fb.control<number | null>(null)
   });
 
   readonly propertiesForm = this.fb.array<PropertyFormGroup>([]);
@@ -193,6 +208,25 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     role: this.fb.nonNullable.control('', { validators: [Validators.required] }),
     direction: this.fb.control<LinkDirection>(LinkDirection.UNI, { validators: [Validators.required] })
   });
+
+  constructor() {
+    this.objectForm.get('classId')!.addValidators(this.disallowClassPlaceholder());
+    this.objectForm.get('classId')!.updateValueAndValidity({ emitEvent: false });
+
+    this.originalObjectData = this.objectForm.getRawValue();
+
+    this.objectForm
+      .valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(value => this.handleObjectFormChange(value));
+
+    this.objectForm
+      .get('classId')!
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe(value => this.classSelection$.next(this.normalizeClassControlValue(value)));
+
+    this.classSelection$.next(this.normalizeClassControlValue(this.objectForm.get('classId')!.value));
+  }
 
   readonly objectId$ = this.route.paramMap.pipe(
     map(params => Number(params.get('id')) || NaN),
@@ -266,6 +300,19 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     catchError(() => {
       this.showMessage('error', 'Не удалось загрузить классы.');
       return of<ObjectClass[]>([]);
+    }),
+    shareReplay(1)
+  );
+
+  readonly acls$ = this.aclApi.list().pipe(
+    map(acls => [...acls].sort((a, b) => a.name.localeCompare(b.name, 'ru'))),
+    tap(acls => {
+      this.availableAcls = acls;
+    }),
+    catchError(() => {
+      this.availableAcls = [];
+      this.showMessage('error', 'Не удалось загрузить список ACL.');
+      return of<Acl[]>([]);
     }),
     shareReplay(1)
   );
@@ -380,6 +427,39 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
     shareReplay(1)
   );
 
+  readonly availablePropertyDefinitions$ = combineLatest([
+    this.propertyDefinitions$,
+    this.classSelection$.pipe(distinctUntilChanged())
+  ]).pipe(
+    switchMap(([defs, classId]) => {
+      if (!Array.isArray(defs) || defs.length === 0) {
+        this.allowedPropertyDefinitions = [];
+        return of<PropertyDefinition[]>([]);
+      }
+
+      if (!classId) {
+        const sorted = this.sortPropertyDefinitions(defs);
+        this.allowedPropertyDefinitions = sorted;
+        return of(sorted);
+      }
+
+      return this.classApi.listEffectiveBindings(classId).pipe(
+        map((effective: EffectiveClassProperty[]) => {
+          const allowedIds = new Set(effective.map(item => item.propertyDefId));
+          const allowed = this.sortPropertyDefinitions(defs.filter(def => allowedIds.has(def.id)));
+          this.allowedPropertyDefinitions = allowed;
+          return allowed;
+        }),
+        catchError(() => {
+          this.showMessage('error', 'Не удалось получить свойства выбранного класса.');
+          this.allowedPropertyDefinitions = [];
+          return of<PropertyDefinition[]>([]);
+        })
+      );
+    }),
+    shareReplay(1)
+  );
+
 
   readonly properties$ = combineLatest([
     this.selectedVersionId$.pipe(distinctUntilChanged()), // ✅ фильтруем повторные ID
@@ -440,7 +520,7 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .get('typeId')!
       .valueChanges.pipe(takeUntil(this.destroy$))
       .subscribe(() => {
-        this.objectForm.get('classId')!.setValue(null);
+        this.objectForm.get('classId')!.setValue(this.classPlaceholderValue);
       });
 
     this.versions$
@@ -527,25 +607,23 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
   }
 
 
-  initObjectForm(object: any): void {
-    this.objectForm = this.fb.group({
-      name: [object.name || '', [Validators.required, Validators.maxLength(255)]],
-      typeId: [object.typeId || null, Validators.required],
-      classId: [object.classId || null]
-    });
+  initObjectForm(object: RepositoryObject | null): void {
+    const classIdValue = object
+      ? (object.classId ?? this.noClassValue)
+      : this.classPlaceholderValue;
+    const nextValue = {
+      name: object?.name ?? '',
+      typeId: object?.typeId ?? null,
+      classId: classIdValue,
+      aclId: object?.aclId ?? null
+    };
 
-    // Сохраняем оригинальные данные для сравнения
-    this.originalObjectData = this.objectForm.getRawValue();
-
-    // Подписываемся на изменения
-    this.objectForm.valueChanges.subscribe(current => {
-      const changed = (Object.keys(current) as (keyof typeof current)[]).some(key => {
-        const currentValue = current[key];
-        const originalValue = this.originalObjectData[key as keyof typeof this.originalObjectData];
-        return currentValue !== originalValue;
-      });
-      this.hasChanges = changed;
-    });
+    this.isFormInitializing = true;
+    this.objectForm.reset(nextValue, { emitEvent: false });
+    this.originalObjectData = { ...nextValue };
+    this.hasChanges = false;
+    this.isFormInitializing = false;
+    this.classSelection$.next(this.normalizeClassControlValue(classIdValue));
   }
 
   get propertiesControls(): PropertyFormGroup[] {
@@ -596,10 +674,12 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       return;
     }
     const value = this.objectForm.getRawValue();
-    const payload = {
+    const normalizedClassId = this.normalizeClassControlValue(value.classId);
+    const payload: RepositoryObjectRequest = {
       name: value.name!.trim(),
       typeId: value.typeId!,
-      classId: value.classId ?? null
+      classId: normalizedClassId,
+      aclId: value.aclId ?? null
     };
     this.isSavingObject = true;
     this.objectApi
@@ -624,10 +704,15 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       .map(ctrl => ctrl.get('propertyDefId')?.value)
       .filter(v => v !== null);
 
-    const availableDefs = this.propertyDefinitions.filter(d => !usedIds.includes(d.id));
+    const availableDefs = this.getAllowedPropertyDefinitions().filter(d => !usedIds.includes(d.id));
 
     if (availableDefs.length === 0) {
-      this.showMessage('info', 'Все свойства уже выбраны.');
+      this.showMessage(
+        'info',
+        this.classSelection$.getValue()
+          ? 'Для выбранного класса нет доступных дополнительных свойств.'
+          : 'Все свойства уже выбраны.'
+      );
       return;
     }
 
@@ -810,6 +895,64 @@ export class ObjectDetailComponent implements OnInit, OnDestroy {
       return '—';
     }
     return this.classesCache.find(cls => cls.id === classId)?.name ?? `ID ${classId}`;
+  }
+
+  includeSelectedDefinition(
+    available: PropertyDefinition[],
+    selectedId: number | null | undefined
+  ): PropertyDefinition[] {
+    if (!selectedId) {
+      return available;
+    }
+    if (available.some(def => def.id === selectedId)) {
+      return available;
+    }
+    const fallback = this.propertyDefinitionMap.get(selectedId);
+    return fallback ? [...available, fallback] : available;
+  }
+
+  private handleObjectFormChange(current: typeof this.objectForm.value): void {
+    if (this.isFormInitializing) {
+      return;
+    }
+
+    const keys = Object.keys(current) as Array<keyof typeof current>;
+    this.hasChanges = keys.some(key => current[key] !== this.originalObjectData[key]);
+  }
+
+  private getAllowedPropertyDefinitions(): PropertyDefinition[] {
+    if (this.allowedPropertyDefinitions.length > 0) {
+      return this.allowedPropertyDefinitions;
+    }
+    return this.propertyDefinitions;
+  }
+
+  private normalizeClassControlValue(value: number | string | null | undefined): number | null {
+    if (value === this.classPlaceholderValue || value === null || value === undefined) {
+      return null;
+    }
+    if (value === this.noClassValue) {
+      return null;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return value;
+  }
+
+  private sortPropertyDefinitions(defs: PropertyDefinition[]): PropertyDefinition[] {
+    return [...defs].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  }
+
+  private disallowClassPlaceholder(): ValidatorFn {
+    return control => {
+      const value = control.value;
+      if (value === this.classPlaceholderValue) {
+        return { required: true };
+      }
+      return null;
+    };
   }
 
   private normalizeId(value: number | string | null | undefined): number | null {

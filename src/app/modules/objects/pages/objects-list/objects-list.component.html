@@ -66,7 +66,7 @@
     </div>
     <div class="card-body">
       <form [formGroup]="createForm" (ngSubmit)="createObject()" class="row g-3">
-        <div class="col-md-6">
+        <div class="col-12 col-lg-5">
           <label for="create-name" class="form-label">Название</label>
           <input
             id="create-name"
@@ -84,7 +84,7 @@
             Название должно быть короче 255 символов.
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-lg-3">
           <label for="create-type" class="form-label">Тип</label>
           <select
             id="create-type"
@@ -99,13 +99,32 @@
             Необходимо выбрать тип объекта.
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-lg-2">
           <label for="create-class" class="form-label">Класс</label>
-          <select id="create-class" class="form-select" formControlName="classId">
-            <option [ngValue]="null">Без класса</option>
+          <select
+            id="create-class"
+            class="form-select"
+            formControlName="classId"
+            [ngClass]="{'is-invalid': createForm.get('classId')?.invalid && (createForm.get('classId')?.dirty || createForm.get('classId')?.touched)}"
+          >
+            <option [ngValue]="classPlaceholderOption" disabled>Выберите класс</option>
+            <option [ngValue]="noClassOptionValue">Без класса</option>
             <option *ngFor="let cls of (createFormClasses$ | async)" [ngValue]="cls.id">{{ cls.name }}</option>
           </select>
+          <div class="invalid-feedback">Укажите класс или выберите «Без класса».</div>
         </div>
+        <ng-container *ngIf="acls$ | async as acls">
+          <div class="col-12 col-sm-6 col-lg-2">
+            <label for="create-acl" class="form-label">Access Control List (ACL)</label>
+            <select id="create-acl" class="form-select" formControlName="aclId">
+              <option [ngValue]="null">Без ACL</option>
+              <option *ngFor="let acl of acls" [ngValue]="acl.id">{{ acl.name }}</option>
+            </select>
+            <div class="form-text text-muted" *ngIf="acls.length === 0">
+              Создайте хотя бы один ACL, чтобы назначить его объекту.
+            </div>
+          </div>
+        </ng-container>
         <div class="col-12 d-flex justify-content-end gap-2 mt-3">
           <button type="button" class="btn btn-outline-secondary" (click)="toggleCreatePanel()">
             <i class="fa-solid fa-ban me-1"></i>

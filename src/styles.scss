@@ -182,6 +182,163 @@ body {
   }
 }
 
+/* Classes module visuals */
+.classes-page {
+  .class-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.85rem;
+    padding: 0.45rem 0.85rem 0.6rem;
+    color: #0f172a;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(
+      135deg,
+      rgba(228, 230, 232, 0.82),
+      hsla(var(--card-accent, 220), 60%, 97%, 0.82)
+    );
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .class-card__header,
+  .class-card__meta,
+  .class-card__trail,
+  .class-card__footer {
+    position: relative;
+    z-index: 1;
+  }
+
+  .class-card__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .class-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.45), transparent 55%);
+    pointer-events: none;
+  }
+
+  .class-card__header {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .class-card__icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.65rem;
+    background: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  }
+
+  .class-card__title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .class-card__name {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font-weight: 600;
+    font-size: 0.98rem;
+    line-height: 1.15;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .class-card__name:hover {
+    text-decoration: underline;
+  }
+
+  .class-card__subtitle {
+    font-size: 0.74rem;
+    color: rgba(15, 23, 42, 0.62);
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .class-card__parent {
+    display: flex;
+    align-items: center;
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    color: rgba(15, 23, 42, 0.6);
+  }
+
+  .class-card__toggle {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 0.6rem;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.8);
+    color: #1e293b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .class-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+  }
+
+  .class-card__meta .badge {
+    font-size: 0.68rem;
+    border-radius: 999px;
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .class-card__trail {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    margin-top: 0.45rem;
+    color: rgba(15, 23, 42, 0.58);
+  }
+
+  .class-card__footer {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+  }
+
+  .class-card__footer .btn {
+    border-radius: 0.55rem;
+  }
+
+  .class-card--selected {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 22px rgba(15, 23, 42, 0.14);
+  }
+
+  .class-card--inactive {
+    filter: grayscale(0.2);
+    opacity: 0.82;
+  }
+}
+
 /* ============================
    Security pages legacy look
    ============================ */

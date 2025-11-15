@@ -7,6 +7,7 @@ export interface RepositoryObject {
   name: string;
   typeId: number;
   classId?: number | null;
+  aclId?: number | null;
   vaultId?: number | null;
   isDeleted?: boolean;
   createdAt?: string;
@@ -21,6 +22,7 @@ export interface RepositoryObjectRequest {
   name: string;
   typeId: number;
   classId?: number | null;
+  aclId?: number | null;
   properties?: PropertyValue[];
 }
 

@@ -2,11 +2,13 @@
   <header class="page-header">
     <div class="page-header__title">
       <h1 class="h3 mb-1">Классы объектов</h1>
-      <p class="text-muted mb-0 page-header__description">Настройка бизнес-классов и связанных с ними свойств</p>
+      <p class="text-muted mb-0 page-header__description">
+        Управление иерархией бизнес-классов, наследованием и привязанными свойствами
+      </p>
     </div>
     <div class="page-header__actions">
       <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
-        <i class="fa-solid fa-rotate-right me-1"></i>Обновить список
+        <i class="fa-solid fa-rotate-right me-1"></i>Обновить данные
       </button>
       <button
         type="button"
@@ -24,13 +26,18 @@
     <div class="col-12 col-xl-5">
       <div class="card border-0 anubis-shadow h-100">
         <div class="card-header bg-white">
-          <h2 class="h5 mb-0">Список классов</h2>
+          <h2 class="h5 mb-0">Иерархия классов</h2>
         </div>
         <div class="card-body border-bottom">
           <form [formGroup]="filterForm" class="row g-3" (ngSubmit)="$event.preventDefault()">
             <div class="col-12">
               <label class="form-label">Поиск</label>
-              <input type="search" class="form-control" formControlName="search" placeholder="Название, ID или тип"/>
+              <input
+                type="search"
+                class="form-control"
+                formControlName="search"
+                placeholder="Название, ID или описание"
+              />
             </div>
             <div class="col-12">
               <label class="form-label">Тип объекта</label>
@@ -47,61 +54,170 @@
             </div>
           </form>
         </div>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead class="table-light text-uppercase small text-muted">
-            <tr>
-              <th scope="col">Название</th>
-              <th scope="col">Тип</th>
-              <th scope="col" class="text-end">Действия</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr
-              *ngFor="let cls of filteredClasses$ | async; trackBy: trackByClassId"
-              [ngClass]="{ 'table-active': (selectedClass$ | async)?.id === cls.id }"
-            >
-              <td>
-                <button class="btn btn-link p-0 fw-semibold" type="button" (click)="selectClass(cls)">
-                  {{ cls.name }}
-                </button>
-                <div class="text-muted small">ID: {{ cls.id }}</div>
-              </td>
-              <td>#{{ cls.objectTypeId }}</td>
-              <td class="text-end">
-                <button class="btn btn-outline-danger btn-icon" type="button" (click)="deleteClass(cls)"
-                        [disabled]="deletingClassId === cls.id">
-                  <i class="fa-solid fa-trash"></i>
-                  <span class="visually-hidden">Удалить</span>
-                </button>
-              </td>
-            </tr>
-            <tr *ngIf="(filteredClasses$ | async)?.length === 0">
-              <td colspan="3" class="text-center text-muted py-4">Классы не найдены.</td>
-            </tr>
-            </tbody>
-          </table>
+        <div class="class-tree">
+          <ng-container *ngIf="treeDisplay$ | async as treeNodes; else classTreeEmpty">
+            <div class="class-tree__list">
+              <div
+                class="class-tree__item"
+                *ngFor="let item of treeNodes; trackBy: trackByTreeNode"
+                [attr.data-depth]="item.depth"
+                [style.--depth]="item.depth"
+                [ngClass]="{
+                  'class-tree__item--selected': currentClassId === item.node.id,
+                  'class-tree__item--inactive': !item.node.isActive,
+                  'class-tree__item--collapsed': item.hasChildren && !item.isExpanded
+                }"
+              >
+                <div class="class-tree__branches" *ngIf="item.depth > 0 || item.ancestorContinuations.length">
+                  <ng-container *ngFor="let cont of item.ancestorContinuations; let level = index">
+                    <span
+                      class="class-tree__branch"
+                      [class.class-tree__branch--continue]="cont"
+                      [style.--level]="level"
+                    ></span>
+                  </ng-container>
+                  <span
+                    *ngIf="item.depth > 0"
+                    class="class-tree__branch class-tree__branch--current"
+                    [class.class-tree__branch--last]="item.isLastChild"
+                    [style.--level]="item.depth - 1"
+                  ></span>
+                </div>
+                <div
+                  class="class-card"
+                  [style.--card-hue]="getHueForClass(item.node.id)"
+                  [style.--card-accent]="getAccentHueForClass(item.node.id)"
+                  [ngClass]="{
+                    'class-card--selected': currentClassId === item.node.id,
+                    'class-card--inactive': !item.node.isActive,
+                    'class-card--collapsed': item.hasChildren && !item.isExpanded
+                  }"
+                >
+                  <div class="class-card__header compact">
+
+                    <!-- ЛЕВАЯ ЧАСТЬ -->
+                    <div class="left">
+                      <div class="class-card__icon" [attr.title]="getDepthLabel(item.depth)">
+                        <i class="fa-solid" [ngClass]="getDepthIcon(item.depth)"></i>
+                      </div>
+
+                      <div class="title-block">
+                        <button type="button" class="class-card__name" (click)="selectClassId(item.node.id)">
+                          {{ item.node.name }}
+                        </button>
+
+                        <div class="class-card__parent" *ngIf="item.node.parentClassId">
+                          <i class="fa-solid fa-turn-up fa-rotate-90 me-1"></i>
+                          <span>Родитель:</span>
+                          <strong class="ms-1">{{ getParentName(item.node.parentClassId) }}&nbsp;</strong>
+                          · {{ getDepthLabel(item.depth) }}
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- ПРАВАЯ ЧАСТЬ -->
+                    <div class="right-all">
+                      <div class="right-info">
+                        <div class="badges">
+      <span class="badge rounded-pill bg-white text-dark">
+        <i class="fa-solid fa-layer-group me-1"></i>{{ getObjectTypeName(item.node.objectTypeId) }}
+      </span>
+
+                          <span class="badge rounded-pill bg-white text-dark" *ngIf="item.node.aclId">
+        <i class="fa-solid fa-shield-halved me-1"></i>ACL #{{ item.node.aclId }}
+      </span>
+
+                          <span class="badge rounded-pill bg-white text-dark" *ngIf="item.node.children.length">
+        <i class="fa-solid fa-children me-1"></i>{{ item.node.children.length }}
+      </span>
+
+                          <span class="badge rounded-pill bg-white text-dark" *ngIf="item.node.isActive === false">
+        <i class="fa-solid fa-circle-xmark me-1"></i>Неактивен
+      </span>
+                        </div>
+
+                        <div class="trail" *ngIf="item.trail.length > 0">
+                          <i class="fa-solid fa-diagram-project me-1"></i>
+                          <ng-container *ngFor="let crumb of item.trail; let last = last">
+                            <span [class.fw-semibold]="last">{{ crumb }}</span>
+                            <span *ngIf="!last" class="trail-sep">›</span>
+                          </ng-container>
+                        </div>
+                      </div>
+
+                      <div class="actions">
+
+                        <button
+                          type="button"
+                          class="btn btn-light btn-sm"
+                          (click)="startCreate(item.node.id, item.node.objectTypeId)"
+                        >
+                          <i class="fa-solid fa-arrow-turn-down me-1"></i>Вложенный
+                        </button>
+
+                        <button
+                          type="button"
+                          class="btn btn-outline-danger btn-sm"
+                          (click)="deleteClass(item.node)"
+                          [disabled]="deletingClassId === item.node.id"
+                        >
+                          <i class="fa-solid fa-trash me-1"></i>Удалить
+                        </button>
+
+                        <button
+                          *ngIf="item.hasChildren"
+                          type="button"
+                          class="class-card__toggle"
+                          (click)="toggleNode(item.node.id)"
+                          [disabled]="item.forceExpanded"
+                        >
+                          <i class="fa-solid" [ngClass]="item.isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+                        </button>
+
+                      </div>
+                    </div>
+
+                  </div>
+
+
+                </div>
+              </div>
+            </div>
+          </ng-container>
+          <ng-template #classTreeEmpty>
+            <div class="class-tree__empty text-center text-muted py-4">
+              Классы не найдены.
+            </div>
+          </ng-template>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-xl-7 mt-4 mt-xl-0">
-      <ng-container *ngIf="isClassFormOpen; else classFormPlaceholder">
-        <div class="section-stack">
+      <div class="section-stack">
+        <ng-container *ngIf="isClassFormOpen">
           <div class="card border-0 anubis-shadow" [ngClass]="{ 'border-success': classForm.valid }">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div class="card-header bg-white d-flex justify-content-between align-items-start flex-wrap gap-2">
               <div>
                 <h2 class="h5 mb-0">{{ (selectedClass$ | async)?.name ?? 'Новый класс' }}</h2>
                 <p class="text-muted small mb-0">
                   {{ (selectedClass$ | async) ? 'Редактирование выбранного класса' : 'Создание нового бизнес-класса' }}
                 </p>
+                <div class="class-breadcrumb text-muted small mt-1" *ngIf="(selectedClassTrail$ | async) as trail">
+                  <ng-container *ngIf="trail.length > 0">
+                    <i class="fa-solid fa-sitemap me-1"></i>
+                    <ng-container *ngFor="let ancestor of trail; let last = last">
+                      <span [ngClass]="{ 'fw-semibold': last }">{{ ancestor.name }}</span>
+                      <span *ngIf="!last" class="class-breadcrumb__separator">›</span>
+                    </ng-container>
+                  </ng-container>
+                </div>
               </div>
               <div class="d-flex align-items-center gap-2">
                 <span
                   *ngIf="(selectedClass$ | async)?.isActive === false"
                   class="badge bg-secondary-subtle text-secondary"
-                >Деактивирован</span
-                >
+                >Деактивирован</span>
                 <button type="button" class="btn btn-outline-secondary" (click)="closeClassForm()">
                   <i class="fa-solid fa-xmark me-1"></i>Скрыть
                 </button>
@@ -132,7 +248,55 @@
                     <option *ngFor="let type of objectTypes$ | async" [ngValue]="type.id">{{ type.name }}</option>
                   </select>
                   <div class="invalid-feedback">Укажите тип объекта.</div>
+                  <div class="form-text text-warning" *ngIf="isObjectTypeSelectorLocked">
+                    Тип определяется родительским классом.
+                  </div>
                 </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label" for="classParent">Родительский класс</label>
+
+                  <!-- ⭐ Если селектор заблокирован — показываем ТОЛЬКО текст -->
+                  <ng-container *ngIf="isParentSelectorLocked; else parentSelector">
+                    <div class="form-control bg-light">
+                      {{ getParentName(classForm.get('parentClassId')?.value) ?? '—' }}
+                    </div>
+                  </ng-container>
+
+                  <!-- ⭐ Полноценный селект, если он НЕ заблокирован -->
+                  <ng-template #parentSelector>
+                    <select
+                      id="classParent"
+                      class="form-select"
+                      formControlName="parentClassId"
+                      [compareWith]="compareById"
+                    >
+
+                    <option [ngValue]="null">Без родителя</option>
+                      <option *ngFor="let option of parentOptions$ | async" [ngValue]="option.id">
+                        {{ formatParentOption(option) }}
+                      </option>
+                    </select>
+                  </ng-template>
+
+                  <div class="form-text">Отображаются только классы выбранного типа объекта.</div>
+
+                  <div class="form-text text-warning" *ngIf="isParentSelectorLocked">
+                    Класс будет создан как дочерний для выбранного родителя.
+                  </div>
+                </div>
+
+                <ng-container *ngIf="acls$ | async as acls">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label" for="classAcl">Access Control List (ACL)</label>
+                    <select id="classAcl" class="form-select" formControlName="aclId">
+                      <option [ngValue]="null">Без ACL</option>
+                      <option *ngFor="let acl of acls" [ngValue]="acl.id">{{ acl.name }}</option>
+                    </select>
+                    <div class="form-text text-muted" *ngIf="acls.length === 0">
+                      Создайте ACL на отдельной странице и вернитесь для привязки.
+                    </div>
+                  </div>
+                </ng-container>
                 <div class="col-12 col-md-6 d-flex align-items-center">
                   <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="classActive" formControlName="isActive"/>
@@ -165,12 +329,14 @@
               </form>
             </div>
           </div>
+        </ng-container>
 
-          <div class="card border-0 anubis-shadow" *ngIf="(selectedClass$ | async) as current">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <ng-container *ngIf="selectedClass$ | async as current; else classInfoPlaceholder">
+          <div class="card border-0 anubis-shadow">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
               <div>
-                <h2 class="h6 mb-0">Привязанные свойства</h2>
-                <p class="text-muted small mb-0">Определяют метаданные доступные для объектов класса</p>
+                <h2 class="h6 mb-0">Привязанные свойства класса</h2>
+                <p class="text-muted small mb-0">Управление собственными свойствами и переопределениями</p>
               </div>
             </div>
             <div class="card-body border-bottom">
@@ -218,10 +384,13 @@
                 </tr>
                 </thead>
                 <tbody>
-                <tr *ngFor="let binding of bindings$ | async; trackBy: trackByBindingId">
+                <tr *ngFor="let binding of bindingsView$ | async; trackBy: trackByBindingId">
                   <td>
                     <div class="fw-semibold">#{{ binding.propertyName }}</div>
-                    <div class="text-muted small">ID привязки: {{ binding.propertyDefId }}</div>
+                    <div class="text-muted small">ID: {{ binding.propertyDefId }}</div>
+                    <div class="text-muted small" *ngIf="binding.overridesParent">
+                      Переопределяет: {{ binding.overriddenClassName ?? 'родительский класс' }}
+                    </div>
                   </td>
                   <td>{{ binding.displayOrder ?? '—' }}</td>
                   <td>
@@ -237,43 +406,109 @@
                           [ngClass]="binding.isActive ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'">
                         {{ binding.isActive ? 'Активно' : 'Выключено' }}
                       </span>
+                    <span class="badge rounded-pill ms-1 bg-info-subtle text-info" *ngIf="binding.overridesParent">Override</span>
                   </td>
                   <td class="text-end">
                     <div class="action-buttons">
                       <button
                         class="btn btn-outline-secondary btn-icon"
                         type="button"
-                        (click)="toggleBindingActive(binding)">
+                        (click)="toggleBindingActive(binding)"
+                      >
                         <i class="fa-solid" [ngClass]="binding.isActive ? 'fa-pause' : 'fa-play'"></i>
                         <span class="visually-hidden">
-                          {{ binding.isActive ? 'Деактивировать' : 'Активировать' }}
-                        </span>
+                            {{ binding.isActive ? 'Деактивировать' : 'Активировать' }}
+                          </span>
                       </button>
-                      <button class="btn btn-outline-danger btn-icon" type="button" (click)="deleteBinding(binding)"
-                              [disabled]="deletingBindingId === binding.id">
+                      <button
+                        class="btn btn-outline-danger btn-icon"
+                        type="button"
+                        (click)="deleteBinding(binding)"
+                        [disabled]="deletingBindingId === binding.id"
+                      >
                         <i class="fa-solid fa-trash"></i>
                         <span class="visually-hidden">Удалить</span>
                       </button>
                     </div>
                   </td>
                 </tr>
-                <tr *ngIf="(bindings$ | async)?.length === 0">
-                  <td colspan="4" class="text-center text-muted py-4">Пока нет привязанных свойств.</td>
+                <tr *ngIf="(bindingsView$ | async)?.length === 0">
+                  <td colspan="4" class="text-center text-muted py-4">Пока нет собственных свойств.</td>
                 </tr>
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-      </ng-container>
-      <ng-template #classFormPlaceholder>
-        <div class="card border-0 anubis-shadow placeholder-card">
-          <div class="card-body text-center py-5">
-            <i class="fa-solid fa-layer-group display-5 text-primary"></i>
-            <p class="mt-3 mb-0 text-muted">Нажмите «Новый класс», чтобы открыть форму создания.</p>
+
+          <div class="card border-0 anubis-shadow">
+            <div class="card-header bg-white">
+              <h2 class="h6 mb-0">Эффективные свойства класса</h2>
+              <p class="text-muted small mb-0">Наследуемые и переопределённые свойства с учётом всей иерархии</p>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light text-uppercase small text-muted">
+                <tr>
+                  <th scope="col">Свойство</th>
+                  <th scope="col">Статус</th>
+                  <th scope="col">Источник</th>
+                  <th scope="col">Порядок</th>
+                  <th scope="col">Флаги</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr *ngFor="let prop of effectivePropertiesView$ | async; trackBy: trackByEffectiveProperty">
+                  <td>
+                    <div class="fw-semibold">#{{ prop.propertyName }}</div>
+                    <div class="text-muted small">ID: {{ prop.propertyDefId }}</div>
+                  </td>
+                  <td>
+                      <span
+                        class="badge rounded-pill"
+                        [ngClass]="prop.inherited ? 'bg-info-subtle text-info' : 'bg-primary-subtle text-primary'"
+                      >
+                        {{ prop.inherited ? 'Наследовано' : 'Определено здесь' }}
+                      </span>
+                    <span class="badge rounded-pill ms-1 bg-warning-subtle text-warning" *ngIf="prop.overridesParent">Override</span>
+                  </td>
+                  <td>
+                    <div>{{ prop.sourceClassName }}</div>
+                    <div class="text-muted small" *ngIf="prop.overridesParent && prop.overriddenClassName">
+                      Родитель: {{ prop.overriddenClassName }}
+                    </div>
+                  </td>
+                  <td>{{ prop.displayOrder ?? '—' }}</td>
+                  <td>
+                      <span class="badge rounded-pill"
+                            [ngClass]="prop.isReadonly ? 'bg-warning-subtle text-warning' : 'bg-light text-muted'">
+                        {{ prop.isReadonly ? 'Только чтение' : 'Редактируемое' }}
+                      </span>
+                    <span class="badge rounded-pill ms-1"
+                          [ngClass]="prop.isHidden ? 'bg-secondary-subtle text-secondary' : 'bg-light text-muted'">
+                        {{ prop.isHidden ? 'Скрыто' : 'Видимо' }}
+                      </span>
+                  </td>
+                </tr>
+                <tr *ngIf="(effectivePropertiesView$ | async)?.length === 0">
+                  <td colspan="5" class="text-center text-muted py-4">Свойства не назначены.</td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </ng-template>
+        </ng-container>
+
+        <ng-template #classInfoPlaceholder>
+          <ng-container *ngIf="!isClassFormOpen">
+            <div class="card border-0 anubis-shadow placeholder-card">
+              <div class="card-body text-center py-5">
+                <i class="fa-solid fa-layer-group display-5 text-primary"></i>
+                <p class="mt-3 mb-0 text-muted">Выберите класс в дереве или нажмите «Новый класс», чтобы начать.</p>
+              </div>
+            </div>
+          </ng-container>
+        </ng-template>
+      </div>
     </div>
   </div>
 </section>
